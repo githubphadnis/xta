@@ -5,8 +5,10 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+
 from app.core.config import settings
 from app.db.session import get_db
+from app.routers import upload
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -23,6 +25,7 @@ if not os.path.exists(static_dir):
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
+app.include_router(upload.router)
 
 # ---------------------------------------------------------
 # 2. Routes
