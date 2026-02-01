@@ -1,0 +1,28 @@
+# Web Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+jinja2>=3.1.0
+python-multipart>=0.0.6    # Required for handling File Uploads
+
+# Database
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# Data Processing & AI
+pandas>=2.2.0              # For parsing CSV/Excel statements
+openpyxl>=3.1.0            # Required by pandas for .xlsx files
+openai>=1.10.0
+httpx>=0.26.0              # Async HTTP client (needed for OpenAI)
+
+# Security
+passlib[bcrypt]>=1.7.4     # For hashing passwords
+python-jose[cryptography]>=3.3.0  # For JWT Tokens
+cryptography>=42.0.0       # For encryption
+
+# Testing & Linting
+pytest>=8.0.0
+ruff>=0.2.0

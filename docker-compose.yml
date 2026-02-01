@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: xta-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=xta_user
+      - POSTGRES_PASSWORD=XTA2026!  # Change this in production
+      - POSTGRES_DB=xtadb
+    restart: unless-stopped
+    networks:
+      - xta-network
+
+  web:
+    build: .
+    container_name: xta-web
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/code  # Hot-reloading for development
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://xta_user:xta_password@db/xtadb
+      - SECRET_KEY=changethis_to_a_secure_random_string
+      - OPENAI_API_KEY=your_openai_key_here
+    depends_on:
+      - db
+    networks:
+      - xta-network
+
+volumes:
+  postgres_data:
+
+networks:
+  xta-network:
+    driver: bridge
