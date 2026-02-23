@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: xta-prod-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - xta_prod_data:/var/lib/postgresql/data
+    networks:
+      - xta_network
+
+  web:
+    # Notice we hardcoded your GHCR image path here
+    image: ghcr.io/githubphadnis/xta:latest
+    container_name: xta-prod-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT}:8080"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - db
+    networks:
+      - xta_network
+
+networks:
+  xta_network:
+    driver: bridge
+
+volumes:
+  xta_prod_data:
