@@ -15,17 +15,20 @@ services:
       - xta-network
 
   web:
-    build: .
+    image: xta-web:latest  # <--- ENTERPRISE FIX 1: Use a tagged image
     container_name: xta-web
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
-      - .:/code  # Hot-reloading for development
+      - C:\projects\xta:/code  # <--- ENTERPRISE FIX 2: Absolute host path
     ports:
-      - "8000:8000"
+      - "8080:8000"  # <--- FIX 3: Moved to 8080 to avoid Portainer conflict
     environment:
-      - DATABASE_URL=postgresql://xta_user:xta_password@db/xtadb
-      - SECRET_KEY=changethis_to_a_secure_random_string
-      - OPENAI_API_KEY=your_openai_key_here
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
     depends_on:
       - db
     networks:

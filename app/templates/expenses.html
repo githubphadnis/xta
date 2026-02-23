@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="sm:flex sm:items-center sm:justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Expense History</h1>
+        <div class="mt-4 sm:mt-0">
+            <a href="/" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+                + New Expense
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
+        <div class="bg-white p-6 rounded-lg shadow border border-gray-100 lg:col-span-2">
+            <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Monthly Spending Trend</h2>
+            <div class="relative h-64 w-full">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow border border-gray-100">
+            <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">By Category</h2>
+            <div class="relative h-64 w-full">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow border border-gray-100 lg:col-span-3">
+            <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Top Vendors</h2>
+            <div class="relative h-64 w-full">
+                <canvas id="vendorChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white shadow sm:rounded-lg overflow-hidden border border-gray-100">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="expense-tbody">
+                    {% for expense in expenses %}
+                    <tr id="expense-row-{{ expense.id }}" class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ expense.date.strftime('%b %d, %Y') }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ expense.vendor }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                {{ expense.category }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                            {{ expense.amount }} {{ expense.currency }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button hx-delete="/expenses/{{ expense.id }}" 
+                                    hx-target="#expense-row-{{ expense.id }}" 
+                                    hx-swap="outerHTML" 
+                                    hx-confirm="Delete receipt from {{ expense.vendor }} forever?"
+                                    class="text-red-500 hover:text-red-700 transition-colors">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 whitespace-nowrap text-sm text-center text-gray-500">
+                            No expenses found. Time to upload some receipts!
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    fetch('/api/expenses/chart-data')
+        .then(response => response.json())
+        .then(data => {
+            const colors = ['#4f46e5', '#818cf8', '#c7d2fe', '#e0e7ff', '#312e81', '#6366f1'];
+            
+            // 1. Trend Line Chart
+            new Chart(document.getElementById('trendChart').getContext('2d'), {
+                type: 'line',
+                data: { 
+                    labels: data.trend.labels, 
+                    datasets: [{ 
+                        label: 'Total Spent (€)', 
+                        data: data.trend.data, 
+                        borderColor: '#4f46e5', 
+                        backgroundColor: '#e0e7ff', 
+                        fill: true, 
+                        tension: 0.4 
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } }, 
+                    scales: { y: { beginAtZero: true } } 
+                }
+            });
+
+            // 2. Category Doughnut
+            new Chart(document.getElementById('categoryChart').getContext('2d'), {
+                type: 'doughnut',
+                data: { 
+                    labels: data.categories.labels, 
+                    datasets: [{ 
+                        data: data.categories.data, 
+                        backgroundColor: colors, 
+                        borderWidth: 0 
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    cutout: '70%', 
+                    plugins: { legend: { position: 'right' } } 
+                }
+            });
+
+            // 3. Top Vendors Bar Chart
+            new Chart(document.getElementById('vendorChart').getContext('2d'), {
+                type: 'bar',
+                data: { 
+                    labels: data.vendors.labels, 
+                    datasets: [{ 
+                        label: 'Spent (€)', 
+                        data: data.vendors.data, 
+                        backgroundColor: '#818cf8', 
+                        borderRadius: 4 
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } }, 
+                    scales: { y: { beginAtZero: true } } 
+                }
+            });
+        })
+        .catch(error => console.error("Error loading chart data:", error));
+</script>
+{% endblock %}

@@ -1,55 +1,116 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="space-y-6">
     
-    <div class="bg-white overflow-hidden shadow rounded-lg col-span-2">
-        <div class="px-4 py-5 sm:p-6">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">Financial Snapshot</h3>
-            <div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-                <div class="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
-                    <dt class="text-sm font-medium text-gray-500 truncate">Total Spent (Month)</dt>
-                    <dd class="mt-1 text-3xl font-semibold text-gray-900">€0.00</dd>
-                </div>
-                <div class="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
-                    <dt class="text-sm font-medium text-gray-500 truncate">Remaining Budget</dt>
-                    <dd class="mt-1 text-3xl font-semibold text-green-600">€1,200.00</dd>
-                </div>
-                <div class="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
-                    <dt class="text-sm font-medium text-gray-500 truncate">Transactions</dt>
-                    <dd class="mt-1 text-3xl font-semibold text-gray-900">0</dd>
-                </div>
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <dt class="text-sm font-medium text-gray-500 truncate">Total Spent (This Month)</dt>
+                <dd class="mt-1 text-3xl font-semibold text-gray-900">€{{ total_spent }}</dd>
+            </div>
+        </div>
+        
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <dt class="text-sm font-medium text-gray-500 truncate">Receipts (This Month)</dt>
+                <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ recent_count }}</dd>
             </div>
         </div>
     </div>
 
-    <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">Quick Upload</h3>
+<div id="upload-container">
+        <form id="upload-form" hx-post="/upload" hx-encoding="multipart/form-data" hx-target="#upload-container" hx-swap="innerHTML" hx-on::after-request="this.reset()" hx-indicator="#loading-spinner">
             
-            <form id="upload-form" 
-                  hx-post="/upload" 
-                  hx-encoding="multipart/form-data" 
-                  hx-target="#upload-area" 
-                  hx-swap="innerHTML">
+            <label id="upload-area" for="file-upload" class="relative block border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-indigo-500 transition-colors cursor-pointer bg-white overflow-hidden">
                 
-                <div id="upload-area" class="mt-4 border-2 border-gray-300 border-dashed rounded-md px-6 pt-5 pb-6 flex justify-center hover:bg-gray-50 transition-colors">
-                    <div class="space-y-1 text-center">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <div class="flex text-sm text-gray-600 justify-center">
-                            <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                                <span>Upload a file</span>
-                                <input id="file-upload" name="file" type="file" class="sr-only" 
-                                       onchange="htmx.trigger('#upload-form', 'submit')">
-                            </label>
-                        </div>
-                        <p class="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
+                <div id="upload-content">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <div class="mt-4 flex text-sm text-gray-600 justify-center">
+                        <span class="font-medium text-indigo-600 hover:text-indigo-500">Upload a file</span>
+                        <p class="pl-1">or drag and drop</p>
                     </div>
+                    <p class="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
                 </div>
-            </form>
+
+                <div id="loading-spinner" class="htmx-indicator absolute inset-0 bg-white/95 flex flex-col items-center justify-center z-10">
+                    <svg class="animate-spin h-10 w-10 text-indigo-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-sm font-medium text-indigo-600 animate-pulse">AI is reading your receipt...</span>
+                </div>
+                
+                <input id="file-upload" name="file" type="file" class="sr-only" onchange="htmx.trigger(this.form, 'submit')">
+            </label>
+        </form>
+    </div>
+
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Recent Activity</h3>
+        </div>
+        <div class="border-t border-gray-200">
+            <ul role="list" class="divide-y divide-gray-200">
+                {% if recent_expenses %}
+                    {% for expense in recent_expenses %}
+                    <li class="px-4 py-4 sm:px-6 hover:bg-gray-50 flex items-center justify-between">
+                        <div class="flex flex-col">
+                            <span class="text-sm font-medium text-indigo-600">{{ expense.vendor }}</span>
+                            <span class="text-sm text-gray-500">{{ expense.date.strftime('%b %d, %Y') }} &middot; {{ expense.category }}</span>
+                        </div>
+                        <div class="text-sm font-semibold text-gray-900">
+                            {{ expense.amount }} {{ expense.currency }}
+                        </div>
+                    </li>
+                    {% endfor %}
+                {% else %}
+                    <li class="px-4 py-4 sm:px-6 text-sm text-gray-500">No expenses yet.</li>
+                {% endif %}
+            </ul>
         </div>
     </div>
+
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    console.log("Dashboard script loaded");
+
+    const dropZone = document.getElementById('upload-area');
+    const fileInput = document.getElementById('file-upload');
+
+    if (dropZone && fileInput) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) { dropZone.classList.add('bg-indigo-50', 'border-indigo-500'); }
+        function unhighlight(e) { dropZone.classList.remove('bg-indigo-50', 'border-indigo-500'); }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                htmx.trigger('#upload-form', 'submit');
+            }
+        }
+    }
+</script>
 {% endblock %}
