@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*' # Triggers when you push a tag like v1.0.1
+      # Add this block to ignore docs and markdown files
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
 
 env:
   REGISTRY: ghcr.io

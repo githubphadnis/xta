@@ -1,0 +1,13 @@
+Nr.,Feature,Description,Prio,Status
+1, Native Camera Support, HTML5 attribute to bypass the gallery and open the mobile camera directly,0,
+2, CSV & Excel Bank Statements," Pandas integration to ingest bulk rows, using a cheap AI text prompt to auto-map the bank's columns (Date, Payee, Amount) to your database",1,
+3, PDF Handling (The Fork)," PyMuPDF integration to extract text from digital bank statements, or convert scanned PDF receipts into JPEGs for the Vision AI",3,
+4,The Bulk-Upload Queue," A ""Pending"" status in the database so you can rapid-fire upload 10 receipts on the go and review/categorize them later",2,
+5, Entity Normalization," Prompt tuning to automatically map variations (eg. ""Kissel Sbk"", ""KISSEL SBK"") into a single, clean retailer name",1,
+6, Multi-Currency Engine, Forex API integration to auto-convert foreign receipts to your home currency based on the transaction date,2,
+7, AI Data Analyst," A chat bar where you can type ""How much did I spend at REWE last month?"" and the AI instantly generates and runs the Text-to-SQL query",3,
+8, Geospatial Visualization, Extract city/address data from receipts and map your spending using Leafletjs or Echarts,4,
+9, Infinite Scroll / Pagination, HTMX chunk loading to keep the frontend lightning fast as your database grows to thousands of receipts,2,
+10, Data Export / Tax Readiness," One-click CSV export of filtered data, bundled with a ZIP file of the associated receipt images for your accountant",3,
+11, Cloudflare Identity Tagging, Reading the Cf-Access-Authenticated-User-Email header to tag expenses to specific family members/users automatically,0,Done
+12,Itemization per receipt,"Read and store each item per receipt allowing for questions like, ""how much did I spend on Crisps last month?"" or ""on an average, how much am I paying for tomatos?""",3,
