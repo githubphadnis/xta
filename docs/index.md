@@ -3,7 +3,7 @@
 
 ## Architecture Blueprint
 
-<pre class="mermaid">
+<div class="mermaid">
 graph TD
     %% Define Styles
     classDef live stroke:#22c55e,stroke-width:2px,fill:#f0fdf4,color:#166534;
@@ -38,7 +38,12 @@ graph TD
     
     %% Styling note
     classDef default font-family:sans-serif;
-</pre>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({ startOnLoad: true });
+</script>
 
 ## Release Timeline
 
@@ -59,8 +64,3 @@ graph TD
 | | Itemization per receipt | Planned |
 | | Hardening, Encrypt data, Scan for Crypto | Planned |
 | | Scan Containers, Generate SBOMs, Generate CBOMs | Planned |
-
-<script type="module">
-  import mermaid from '[https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs](https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs)';
-  mermaid.initialize({ startOnLoad: true });
-</script>
