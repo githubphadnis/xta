@@ -1,35 +1,55 @@
-version: '3.8'
+version: "3.8"
 
 services:
   db:
-    image: postgres:16 # The glorious, working Debian image
-    container_name: xta-prod-db
+    image: postgres:16
+    container_name: ctrl-xta-prod-db
     restart: unless-stopped
+
     environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASS}
-      - POSTGRES_DB=${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+      # Optional but nice: makes init/psql output consistent
+      TZ: Europe/Berlin
+
     volumes:
       - xta_prod_data:/var/lib/postgresql/data
+
     networks:
       - xta_network
 
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -h 127.0.0.1 -p 5432"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+    # Optional: expose to your LAN (NOT needed for web container access)
+    # ports:
+    #   - "5432:5432"
+
   web:
     image: ghcr.io/githubphadnis/xta:latest
-    container_name: xta-prod-web
+    container_name: ctrl-xta-prod-web
     restart: unless-stopped
+
     ports:
-      - "8080:8080"
+      - "8080:8000"
+
     environment:
-      # Passing the exact variables the Python app needs to build its connection
-      - POSTGRES_SERVER=db
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASS}
-      - POSTGRES_DB=${DB_NAME}
-      - SECRET_KEY=${SECRET_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      POSTGRES_SERVER: db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+      SECRET_KEY: ${SECRET_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      TZ: Europe/Berlin
+
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
     networks:
       - xta_network
 
