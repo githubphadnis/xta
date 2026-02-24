@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:16
+    image: postgres:16 # The glorious, working Debian image
     container_name: xta-prod-db
     restart: unless-stopped
     environment:
@@ -21,7 +21,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@db:5432/${DB_NAME}
+      # Passing the exact variables the Python app needs to build its connection
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_DB=${DB_NAME}
+      - SECRET_KEY=${SECRET_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - db
