@@ -3,24 +3,25 @@ import json
 import os
 from datetime import datetime
 from openai import OpenAI
+from app.core.config import settings
 
 class OCRService:
     def __init__(self):
-        # 1. Hijack the OpenAI client to point to the local Docker container
-        self.client = OpenAI(
-            base_url="http://ollama:11434/v1",
-            api_key="ollama" # The library requires a string, but Ollama ignores it
-        )
+        # The Smart Toggle: Defaults to 'cloud' (OpenAI) if not specified
+        self.ai_mode = os.getenv("AI_MODE", "cloud").lower()
+        
+        if self.ai_mode == "local":
+            self.client = OpenAI(base_url="http://ollama:11434/v1", api_key="ollama")
+            self.model = "llama3.2-vision"
+        else:
+            self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+            self.model = "gpt-4o"
 
     def encode_image(self, image_path: str) -> str:
-        """Helper to convert image to base64 for the API"""
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
 
     def parse_receipt(self, file_path: str) -> dict:
-        """
-        Sends the image to the Local Llama 3.2 Vision model and returns structured JSON.
-        """
         try:
             base64_image = self.encode_image(file_path)
         except Exception as e:
@@ -28,7 +29,6 @@ class OCRService:
 
         current_year = datetime.now().year
 
-        # 2. Define the Prompt
         prompt = f"""
         You are a highly precise expense tracking data extraction assistant. Analyze this receipt image.
         Return a valid JSON object ONLY. Do not include markdown formatting or explanation text.
@@ -43,9 +43,8 @@ class OCRService:
         """
 
         try:
-            # 3. Call Local Ollama
             response = self.client.chat.completions.create(
-                model="llama3.2-vision", # Explicitly request the model we just downloaded
+                model=self.model, 
                 response_format={ "type": "json_object" }, 
                 messages=[
                     {
@@ -65,17 +64,16 @@ class OCRService:
                 temperature=0.0
             )
 
-            # 4. Extract and Clean Response
             raw_content = response.choices[0].message.content.strip()
             
-            # Safety Net: Open-source models sometimes wrap JSON in markdown anyway
+            # Left the safety net in, as it helps both models
             if raw_content.startswith("```"):
                 raw_content = raw_content.replace("```json", "").replace("```", "").strip()
 
             return json.loads(raw_content)
 
         except Exception as e:
-            print(f"Local OCR Error: {e}")
+            print(f"OCR Error: {e}")
             return {
                 "vendor": "Unknown",
                 "amount": 0.0,

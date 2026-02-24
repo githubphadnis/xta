@@ -2,16 +2,33 @@ import pandas as pd
 import json
 import io
 import math
+import os
 from openai import OpenAI
 from app.core.config import settings
 from datetime import datetime
 
 class StatementService:
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.ai_mode = os.getenv("AI_MODE", "cloud").lower()
+        
+        if self.ai_mode == "local":
+            self.client = OpenAI(base_url="http://ollama:11434/v1", api_key="ollama")
+            self.model = "llama3.2"
+        else:
+            self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+            self.model = "gpt-4o-mini"
+
+    def _clean_json_response(self, raw_content: str) -> dict:
+        raw_content = raw_content.strip()
+        if raw_content.startswith("```"):
+            raw_content = raw_content.replace("```json", "").replace("```", "").strip()
+        try:
+            return json.loads(raw_content)
+        except json.JSONDecodeError as e:
+            print(f"JSON Decode Error: {e} - Raw Content: {raw_content}")
+            return {}
 
     def process_file(self, file_contents: bytes, filename: str) -> list:
-        # 1. Load the file into a Pandas DataFrame
         try:
             if filename.lower().endswith('.csv'):
                 df = pd.read_csv(io.BytesIO(file_contents), sep=None, engine='python', encoding_errors='replace')
@@ -25,7 +42,6 @@ class StatementService:
         df.dropna(how='all', inplace=True)
         df.dropna(axis=1, how='all', inplace=True)
 
-        # 2. Extract a sample and ask AI to map the columns
         sample_csv = df.head(5).to_csv(index=False)
         col_prompt = f"""
         Identify the exact column headers for date, vendor/payee, and amount from this sample.
@@ -39,12 +55,12 @@ class StatementService:
 
         try:
             col_response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=self.model,
                 response_format={ "type": "json_object" },
                 messages=[{"role": "user", "content": col_prompt}],
                 temperature=0.0
             )
-            mapping = json.loads(col_response.choices[0].message.content.strip())
+            mapping = self._clean_json_response(col_response.choices[0].message.content)
             
             date_col = mapping.get('date_column')
             vendor_col = mapping.get('vendor_column')
@@ -55,8 +71,6 @@ class StatementService:
         except Exception as e:
             return [{"error": f"Column mapping failed: {e}"}]
 
-        # 3. AI Batch Normalization & Categorization
-        # Get up to 100 unique vendor names from the CSV to send to the AI
         unique_vendors = [v for v in df[vendor_col].dropna().unique().tolist() if str(v).strip()]
         
         vendor_prompt = f"""
@@ -68,17 +82,16 @@ class StatementService:
 
         try:
             vendor_response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=self.model,
                 response_format={ "type": "json_object" },
                 messages=[{"role": "user", "content": vendor_prompt}],
                 temperature=0.0
             )
-            vendor_map = json.loads(vendor_response.choices[0].message.content.strip())
+            vendor_map = self._clean_json_response(vendor_response.choices[0].message.content)
         except Exception as e:
             print(f"Vendor mapping failed, falling back to raw data: {e}")
             vendor_map = {}
 
-        # 4. Process the DataFrame
         expenses = []
         for index, row in df.iterrows():
             try:
@@ -86,18 +99,16 @@ class StatementService:
                 if raw_amount.lower() in ['nan', 'none', '']:
                     continue
                 
-                # Smart Decimal Parsing (Handles both 12.34 and 12,34)
                 if ',' in raw_amount and '.' in raw_amount:
                     if raw_amount.rfind(',') > raw_amount.rfind('.'):
-                        raw_amount = raw_amount.replace('.', '').replace(',', '.') # European: 1.234,56 -> 1234.56
+                        raw_amount = raw_amount.replace('.', '').replace(',', '.') 
                     else:
-                        raw_amount = raw_amount.replace(',', '') # US/UK: 1,234.56 -> 1234.56
+                        raw_amount = raw_amount.replace(',', '') 
                 elif ',' in raw_amount and len(raw_amount.split(',')[-1]) <= 2:
-                    raw_amount = raw_amount.replace(',', '.') # European simple: 12,34 -> 12.34
+                    raw_amount = raw_amount.replace(',', '.') 
                 
                 amount = float(raw_amount)
                 
-                # Skip positive income
                 if amount >= 0:
                     continue 
 
