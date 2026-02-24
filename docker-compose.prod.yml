@@ -53,15 +53,15 @@ services:
     networks:
       - xta_network
       
-    # --- NEW: Local AI Engine ---
-    ollama:
-      image: ollama/ollama:latest
-      container_name: xta-prod-ollama
-      restart: unless-stopped
-      volumes:
-        - ollama_data:/root/.ollama
-      networks:
-        - xta_network
+  # --- NEW: Local AI Engine ---
+  ollama:
+    image: ollama/ollama:latest
+    container_name: xta-prod-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - xta_network
 networks:
   xta_network:
     driver: bridge
