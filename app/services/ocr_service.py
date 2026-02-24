@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+from datetime import datetime
 from openai import OpenAI
 from app.core.config import settings
 
@@ -24,25 +25,28 @@ class OCRService:
         except Exception as e:
             return {"error": f"Could not read file: {e}"}
 
-        # 2. Define the Prompt (Strict JSON output)
-        prompt = """
-        You are an expense tracking assistant. Analyze this receipt image.
-        Extract the following fields and return them as a valid JSON object ONLY. 
-        Do not wrap in markdown code blocks.
-        
-        Fields required:
-        - vendor (string): Name of the merchant
-        - date (string): Date in YYYY-MM-DD format. If year is missing, assume current year.
-        - amount (float): Total amount.
-        - currency (string): ISO 3-letter currency code (e.g. EUR, USD). Default to EUR if symbol is €.
-        - category (string): Guess a category (e.g. Food, Transport, Utilities, Groceries).
-        - description (string): A short 3-5 word summary.
+        # Dynamically inject the current year into the prompt
+        current_year = datetime.now().year
+
+        # 2. Define the Prompt (Strict instructions for Entity Normalization)
+        prompt = f"""
+        You are a highly precise expense tracking data extraction assistant. Analyze this receipt image.
+        Return a valid JSON object ONLY.
+
+        Extraction and Normalization Rules:
+        - vendor (string): CRITICAL: Normalize the merchant name to its core brand. Remove all legal suffixes (e.g., GmbH, KG, AG, e.K., OHG, mbH). Fix casing to standard brand representation. Examples: "REWE Markt GmbH" -> "REWE", "Kissel Sbk" -> "Kissel", "ALDI SÜD" -> "Aldi".
+        - date (string): Exact date in YYYY-MM-DD format. If the year is missing, assume it is {current_year}.
+        - amount (float): Total final amount charged.
+        - currency (string): ISO 3-letter currency code. Default to EUR.
+        - category (string): Categorize the expense. You MUST choose exactly one from this exact list: [Groceries, Dining, Transport, Utilities, Shopping, Entertainment, Health, Travel, Home, Other].
+        - description (string): A short 3-5 word summary of the main items purchased.
         """
 
         # 3. Call OpenAI
         try:
             response = self.client.chat.completions.create(
                 model="gpt-4o", 
+                response_format={ "type": "json_object" }, # Forces strict JSON architecture
                 messages=[
                     {
                         "role": "user",
@@ -58,16 +62,11 @@ class OCRService:
                     }
                 ],
                 max_tokens=300,
-                temperature=0.1 # Low temperature = more factual
+                temperature=0.0 # Dropped to 0.0 for absolute deterministic data extraction
             )
 
             # 4. Extract and Clean Response
             raw_content = response.choices[0].message.content.strip()
-            
-            # Remove markdown formatting if OpenAI adds it
-            if raw_content.startswith("```"):
-                raw_content = raw_content.replace("```json", "").replace("```", "")
-            
             return json.loads(raw_content)
 
         except Exception as e:
@@ -76,7 +75,7 @@ class OCRService:
             return {
                 "vendor": "Unknown",
                 "amount": 0.0,
-                "date": "2025-01-01",
+                "date": f"{datetime.now().strftime('%Y-%m-%d')}",
                 "error": str(e)
             }
 

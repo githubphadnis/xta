@@ -43,7 +43,10 @@
                     <span class="text-sm font-medium text-indigo-600 animate-pulse">AI is reading your receipt...</span>
                 </div>
                 
-                <input id="file-upload" name="file" type="file" class="sr-only" onchange="htmx.trigger(this.form, 'submit')">
+                <input id="file-upload" name="file" type="file" class="sr-only" 
+       accept="image/*, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/pdf" 
+       capture="environment" 
+       onchange="htmx.trigger(this.form, 'submit')">
             </label>
         </form>
     </div>
