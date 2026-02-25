@@ -7,7 +7,6 @@ from app.core.config import settings
 
 class OCRService:
     def __init__(self):
-        # The Smart Toggle: Defaults to 'cloud' (OpenAI) if not specified
         self.ai_mode = os.getenv("AI_MODE", "cloud").lower()
         
         if self.ai_mode == "local":
@@ -40,6 +39,10 @@ class OCRService:
         - currency (string): ISO 3-letter currency code. Default to EUR.
         - category (string): Categorize the expense. You MUST choose exactly one from this exact list: [Groceries, Dining, Transport, Utilities, Shopping, Entertainment, Health, Travel, Home, Other].
         - description (string): A short 3-5 word summary of the main items purchased.
+        - receipt_details (array): Extract every individual line item purchased on the receipt. Each item in the array must be an object with:
+            - name (string): The name of the product or service.
+            - quantity (float): The quantity purchased (default to 1.0 if not explicitly stated).
+            - price (float): The total final price for this line item.
         """
 
         try:
@@ -60,17 +63,22 @@ class OCRService:
                         ]
                     }
                 ],
-                max_tokens=300,
+                max_tokens=1000, 
                 temperature=0.0
             )
 
             raw_content = response.choices[0].message.content.strip()
             
-            # Left the safety net in, as it helps both models
             if raw_content.startswith("```"):
                 raw_content = raw_content.replace("```json", "").replace("```", "").strip()
 
-            return json.loads(raw_content)
+            parsed_data = json.loads(raw_content)
+            
+            # Safety net to ensure the key always exists even if AI missed it
+            if "receipt_details" not in parsed_data:
+                parsed_data["receipt_details"] = []
+                
+            return parsed_data
 
         except Exception as e:
             print(f"OCR Error: {e}")
@@ -78,6 +86,7 @@ class OCRService:
                 "vendor": "Unknown",
                 "amount": 0.0,
                 "date": f"{datetime.now().strftime('%Y-%m-%d')}",
+                "receipt_details": [],
                 "error": str(e)
             }
 
