@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.db.session import get_db
-from app.models.expense import Expense
+from app.models.expense import Expense, ExpenseItem
 from app.services.ocr_service import ocr_service
 from app.services.statement_service import statement_service
 
@@ -19,11 +19,8 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
     # --- ROUTE 1: SPREADSHEETS (CSV / EXCEL) ---
     if filename.endswith(('.csv', '.xls', '.xlsx')):
         contents = await file.read()
-        
-        # Send to the Pandas / AI Mapper Service
         expenses_data = statement_service.process_file(contents, filename)
         
-        # Handle Errors
         if not expenses_data or "error" in expenses_data[0]:
             error_msg = expenses_data[0].get("error", "Failed to parse spreadsheet.") if expenses_data else "No data found."
             return f"""
@@ -33,10 +30,9 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
             </div>
             """
             
-        # Bulk Insert into Database with Deduplication
         db_expenses = []
         duplicates_skipped = 0
-        seen_in_batch = set() # Catches duplicates within the CSV itself
+        seen_in_batch = set() 
         
         for item in expenses_data:
             date_str = item.get("date", datetime.now().strftime("%Y-%m-%d"))
@@ -48,14 +44,12 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
             amount = item.get("amount", 0.0)
             vendor = item.get("vendor", "Unknown")
             
-            # 1. Check if we already processed this exact row in the current CSV
             batch_key = (parsed_date, amount, vendor)
             if batch_key in seen_in_batch:
                 duplicates_skipped += 1
                 continue
             seen_in_batch.add(batch_key)
 
-            # 2. Check if it already exists in the database
             existing_expense = db.query(Expense).filter(
                 Expense.date == parsed_date,
                 Expense.amount == amount,
@@ -92,15 +86,12 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
 
     # --- ROUTE 2: IMAGES (RECEIPTS) ---
     elif filename.endswith(('.png', '.jpg', '.jpeg')):
-        # Save temp file for the OCR service
         temp_file_path = f"/tmp/{file.filename}"
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # Send to the OpenAI Vision Service
         extracted_data = ocr_service.parse_receipt(temp_file_path)
         
-        # Clean up temp file
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
             
@@ -121,7 +112,6 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
         amount = extracted_data.get("amount", 0.0)
         vendor = extracted_data.get("vendor", "Unknown")
 
-        # Duplicate Check for Single Receipt
         existing_expense = db.query(Expense).filter(
             Expense.date == parsed_date,
             Expense.amount == amount,
@@ -136,7 +126,7 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
             </div>
             """
 
-        # Insert Single Receipt into Database
+        # 1. Create the parent receipt
         new_expense = Expense(
             vendor=vendor,
             date=parsed_date,
@@ -145,12 +135,26 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
             category=extracted_data.get("category", "Uncategorized"),
             description=extracted_data.get("description", "")
         )
+
+        # 2. Extract and attach the receipt details (Line Items)
+        receipt_details = extracted_data.get("receipt_details", [])
+        for detail in receipt_details:
+            new_item = ExpenseItem(
+                name=detail.get("name", "Unknown Item"),
+                quantity=float(detail.get("quantity", 1.0)),
+                price=float(detail.get("price", 0.0))
+            )
+            new_expense.items.append(new_item)
+
+        # 3. Commit everything at once. SQLAlchemy handles the IDs automatically.
         db.add(new_expense)
         db.commit()
         
+        items_count_msg = f" with {len(receipt_details)} item(s) detailed" if receipt_details else ""
+
         return f"""
         <div class="p-12 text-center bg-green-50 rounded-lg border-2 border-green-500 border-dashed">
-            <h3 class="text-lg font-medium text-green-800">Receipt processed: {new_expense.vendor} (€{new_expense.amount})</h3>
+            <h3 class="text-lg font-medium text-green-800">Receipt processed: {new_expense.vendor} (€{new_expense.amount}){items_count_msg}</h3>
             <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Refresh Dashboard</button>
         </div>
         """
