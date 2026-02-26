@@ -30,7 +30,8 @@ services:
     #   - "5432:5432"
 
   web:
-    image: ghcr.io/githubphadnis/xta:latest
+    build: .
+    # image: ghcr.io/githubphadnis/xta:latest
     container_name: ctrl-xta-prod-web
     restart: unless-stopped
 
@@ -53,11 +54,9 @@ services:
     networks:
       - xta_network
       
- 
 networks:
   xta_network:
     driver: bridge
 
 volumes:
   xta_prod_data:
- 

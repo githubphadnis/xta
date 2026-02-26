@@ -7,7 +7,6 @@ from app.core.config import settings
 
 class OCRService:
     def __init__(self):
-        # The Smart Toggle: Defaults to 'cloud' (OpenAI) if not specified
         self.ai_mode = os.getenv("AI_MODE", "cloud").lower()
         
         if self.ai_mode == "local":
@@ -28,18 +27,18 @@ class OCRService:
             return {"error": f"Could not read file: {e}"}
 
         current_year = datetime.now().year
-
         prompt = f"""
         You are a highly precise expense tracking data extraction assistant. Analyze this receipt image.
         Return a valid JSON object ONLY. Do not include markdown formatting or explanation text.
 
         Extraction and Normalization Rules:
-        - vendor (string): CRITICAL: Normalize the merchant name to its core brand. Remove all legal suffixes (e.g., GmbH, KG, AG, e.K., OHG, mbH). Fix casing to standard brand representation. Examples: "REWE Markt GmbH" -> "REWE", "Kissel Sbk" -> "Kissel", "ALDI SÜD" -> "Aldi".
-        - date (string): Exact date in YYYY-MM-DD format. If the year is missing, assume it is {current_year}.
-        - amount (float): Total final amount charged.
-        - currency (string): ISO 3-letter currency code. Default to EUR.
-        - category (string): Categorize the expense. You MUST choose exactly one from this exact list: [Groceries, Dining, Transport, Utilities, Shopping, Entertainment, Health, Travel, Home, Other].
-        - description (string): A short 3-5 word summary of the main items purchased.
+        - vendor (string): Normalize merchant name (remove legal suffixes like GmbH).
+        - date (string): YYYY-MM-DD format. Default year: {current_year}.
+        - amount (float): Total final amount.
+        - currency (string): ISO 3-letter code. Default: EUR.
+        - category (string): Exactly one from [Groceries, Dining, Transport, Utilities, Shopping, Entertainment, Health, Travel, Home, Other].
+        - description (string): Short 3-5 word summary.
+        - items (array of objects): Extract all individual line items. Each object MUST contain 'name' (string), 'quantity' (float), and 'price' (float).
         """
 
         try:
@@ -53,24 +52,29 @@ class OCRService:
                             {"type": "text", "text": prompt},
                             {
                                 "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
-                                }
+                                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
                             }
                         ]
                     }
                 ],
-                max_tokens=300,
+                max_tokens=1500,  # Increased capacity for itemization
                 temperature=0.0
             )
 
             raw_content = response.choices[0].message.content.strip()
             
-            # Left the safety net in, as it helps both models
+            # Remove markdown blocks if present
             if raw_content.startswith("```"):
                 raw_content = raw_content.replace("```json", "").replace("```", "").strip()
 
-            return json.loads(raw_content)
+            try:
+                return json.loads(raw_content)
+            except json.JSONDecodeError:
+                # LOUD FAILURE for truncated JSON
+                return {
+                    "vendor": "Unknown",
+                    "error": "The receipt was too long to process. The data was truncated by the LLM."
+                }
 
         except Exception as e:
             print(f"OCR Error: {e}")
