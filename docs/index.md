@@ -1,6 +1,10 @@
 # Xpense Tracking App (XTA)
 **Secure, Self-Hosted Financial Data Pipeline**
 
+## Operations
+
+- Post-deploy runbook: `docs/post-deploy-checklist.md`
+
 ## Architecture Blueprint
 
 <div class="mermaid">
