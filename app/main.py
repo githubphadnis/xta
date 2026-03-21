@@ -2,6 +2,7 @@
 import os
 from datetime import datetime
 from fastapi import FastAPI, Request, Depends
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -64,5 +65,8 @@ def health_check(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
         return {"status": "online", "database": "connected"}
-    except Exception as e:
-        return {"status": "online", "database": f"disconnected: {str(e)}"}
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "offline", "database": "disconnected"},
+        )
