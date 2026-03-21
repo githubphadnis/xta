@@ -1,4 +1,5 @@
 import os
+import secrets
 from dotenv import load_dotenv
 
 # 1. This line finds the local .env file and loads it into memory
@@ -17,7 +18,7 @@ class Settings:
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "xta_db")
     
     # 3. Security Config
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "super_secret_default_key")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
     # 4. Construct the Database URL dynamically

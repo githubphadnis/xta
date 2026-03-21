@@ -12,9 +12,9 @@ from alembic import context
 # -----------------------------------------------------------
 sys.path.append(os.getcwd())
 
-# 2. Import our application config and models
+# 2. Import our application config and runtime models
 from app.core.config import settings
-from app.db.base import Base  # This imports User and Expense models
+from app.db.base import Base  # Imports runtime Expense and ExpenseItem models
 
 # 3. Alembic Config object
 config = context.config

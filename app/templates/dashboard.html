@@ -32,7 +32,7 @@
                         <span class="font-medium text-indigo-600 hover:text-indigo-500">Upload a file</span>
                         <p class="pl-1">or drag and drop</p>
                     </div>
-                    <p class="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                    <p class="text-xs text-gray-500">PNG, JPG, JPEG, CSV, XLS, XLSX up to 10MB</p>
                 </div>
 
                 <div id="loading-spinner" class="htmx-indicator absolute inset-0 bg-white/95 flex flex-col items-center justify-center z-10">
@@ -44,7 +44,7 @@
                 </div>
                 
                 <input id="file-upload" name="file" type="file" class="sr-only" 
-       accept="image/*, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/pdf" 
+       accept=".png,.jpg,.jpeg,.csv,.xls,.xlsx" 
        capture="environment" 
        onchange="htmx.trigger(this.form, 'submit')">
             </label>
