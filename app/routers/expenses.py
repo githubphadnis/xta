@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import require_user_email
@@ -14,6 +13,20 @@ from app.services.finance import fx_service
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+
+def _parse_filter_dates(month: str | None, start_date: str | None, end_date: str | None) -> tuple[date_type | None, date_type | None]:
+    if month:
+        year, month_num = month.split("-", 1)
+        start = datetime.strptime(f"{year}-{month_num}-01", "%Y-%m-%d").date()
+        if int(month_num) == 12:
+            end = datetime.strptime(f"{int(year) + 1}-01-01", "%Y-%m-%d").date()
+        else:
+            end = datetime.strptime(f"{year}-{int(month_num) + 1:02d}-01", "%Y-%m-%d").date()
+        return start, end
+    parsed_start = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
+    parsed_end = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
+    return parsed_start, parsed_end
 
 @router.post("/expenses/confirm")
 async def confirm_expense(
