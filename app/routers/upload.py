@@ -180,6 +180,7 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
             try:
                 parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
             except ValueError:
+                # Prefer row-level date if parse failed, otherwise use today.
                 parsed_date = datetime.now().date()
 
             amount = float(item.get("amount", 0.0))

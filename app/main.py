@@ -1,6 +1,5 @@
-#2 - Dirty push trick
 import os
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -51,7 +50,50 @@ def read_root(request: Request, db: Session = Depends(get_db)):
         extract('year', Expense.date) == current_year
     ).count()
 
-    # 3. Get Recent Activity (Last 5 expenses)
+    # 3. Rolling 30-day and previous-30-day spend for quick trend context.
+    today = date.today()
+    rolling_start = today - timedelta(days=30)
+    previous_start = rolling_start - timedelta(days=30)
+    rolling_30d_spend = (
+        db.query(func.sum(Expense.base_currency_amount))
+        .filter(
+            Expense.owner_email == user_email,
+            Expense.date >= rolling_start,
+            Expense.date <= today,
+        )
+        .scalar()
+        or 0.0
+    )
+    previous_30d_spend = (
+        db.query(func.sum(Expense.base_currency_amount))
+        .filter(
+            Expense.owner_email == user_email,
+            Expense.date >= previous_start,
+            Expense.date < rolling_start,
+        )
+        .scalar()
+        or 0.0
+    )
+    spend_delta_pct = 0.0
+    if previous_30d_spend > 0:
+        spend_delta_pct = ((rolling_30d_spend - previous_30d_spend) / previous_30d_spend) * 100.0
+
+    # 4. Top category this month for a richer at-a-glance dashboard signal.
+    top_category_row = (
+        db.query(Expense.category, func.sum(Expense.base_currency_amount).label("amount"))
+        .filter(
+            Expense.owner_email == user_email,
+            extract('month', Expense.date) == current_month,
+            extract('year', Expense.date) == current_year,
+        )
+        .group_by(Expense.category)
+        .order_by(func.sum(Expense.base_currency_amount).desc())
+        .first()
+    )
+    top_category_name = top_category_row[0] if top_category_row else "N/A"
+    top_category_amount = float(top_category_row[1]) if top_category_row else 0.0
+
+    # 5. Get Recent Activity (Last 5 expenses)
     recent_expenses = (
         db.query(Expense)
         .filter(Expense.owner_email == user_email)
@@ -70,6 +112,10 @@ def read_root(request: Request, db: Session = Depends(get_db)):
             "recent_count": recent_count,
             "recent_expenses": recent_expenses,
             "base_currency": settings.BASE_CURRENCY,
+            "rolling_30d_spend": f"{rolling_30d_spend:.2f}",
+            "spend_delta_pct": f"{spend_delta_pct:.1f}",
+            "top_category_name": top_category_name,
+            "top_category_amount": f"{top_category_amount:.2f}",
         },
     )
 

@@ -68,19 +68,6 @@ async def pin_saved_query(saved_query_id: int, request: Request, db: Session = D
     return {"id": saved.id, "status": "pinned"}
 
 
-@router.delete("/{saved_query_id}")
-async def delete_saved_query(saved_query_id: int, request: Request, db: Session = Depends(get_db)):
-    user_email = require_user_email(request)
-    saved = (
-        db.query(SavedQuery)
-        .filter(SavedQuery.id == saved_query_id, SavedQuery.owner_email == user_email)
-        .first()
-    )
-    if not saved:
-        raise HTTPException(status_code=404, detail="Saved query not found")
-    db.delete(saved)
-    db.commit()
-    return {"id": saved_query_id, "status": "deleted"}
 
 
 @router.get("/saved")
@@ -103,3 +90,18 @@ async def list_saved_queries(request: Request, db: Session = Depends(get_db)):
         }
         for row in rows
     ]
+
+
+@router.delete("/{saved_query_id}")
+async def delete_saved_query(saved_query_id: int, request: Request, db: Session = Depends(get_db)):
+    user_email = require_user_email(request)
+    saved = (
+        db.query(SavedQuery)
+        .filter(SavedQuery.id == saved_query_id, SavedQuery.owner_email == user_email)
+        .first()
+    )
+    if not saved:
+        raise HTTPException(status_code=404, detail="Saved query not found")
+    db.delete(saved)
+    db.commit()
+    return {"id": saved_query_id, "status": "deleted"}

@@ -2,19 +2,51 @@
 
 {% block content %}
 <div class="space-y-6">
+    <form method="get" action="/" class="bg-white rounded-lg border border-gray-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Month</label>
+            <input type="month" name="month" value="{{ filter_month }}" class="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Start date</label>
+            <input type="date" name="start_date" value="{{ filter_start_date }}" class="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">End date</label>
+            <input type="date" name="end_date" value="{{ filter_end_date }}" class="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="rounded bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-700">Apply</button>
+            <a href="/" class="rounded bg-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-300">Clear</a>
+        </div>
+    </form>
     
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <dt class="text-sm font-medium text-gray-500 truncate">Total Spent (This Month)</dt>
+                <dt class="text-sm font-medium text-gray-500 truncate">Total Spent (Selected)</dt>
                 <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ base_currency }} {{ total_spent }}</dd>
             </div>
         </div>
         
         <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <dt class="text-sm font-medium text-gray-500 truncate">Receipts (This Month)</dt>
+                <dt class="text-sm font-medium text-gray-500 truncate">Transactions (Selected)</dt>
                 <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ recent_count }}</dd>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <dt class="text-sm font-medium text-gray-500 truncate">Average Transaction</dt>
+                <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ base_currency }} {{ avg_spent }}</dd>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <dt class="text-sm font-medium text-gray-500 truncate">Top Category</dt>
+                <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ top_category }}</dd>
             </div>
         </div>
     </div>
