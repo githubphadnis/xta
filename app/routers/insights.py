@@ -13,20 +13,10 @@ router = APIRouter(prefix="/api/insights", tags=["insights"])
 async def ask_question(
     request: Request,
     question: str = Form(...),
-    month: str = Form(default=""),
-    start_date: str = Form(default=""),
-    end_date: str = Form(default=""),
     db: Session = Depends(get_db),
 ):
     user_email = require_user_email(request)
-    result = query_service.answer_question(
-        db=db,
-        owner_email=user_email,
-        question=question,
-        month=month or None,
-        start_date=start_date or None,
-        end_date=end_date or None,
-    )
+    result = query_service.answer_question(db=db, owner_email=user_email, question=question)
     return {
         "question": result.question,
         "summary": result.summary,

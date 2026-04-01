@@ -11,32 +11,10 @@
         </div>
     </div>
 
-    <form method="get" action="/expenses" class="bg-white p-4 rounded-lg shadow border border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-        <div>
-            <label for="month-filter" class="block text-xs font-medium text-gray-600 mb-1">Month</label>
-            <input id="month-filter" type="month" name="month" value="{{ filter_month }}" class="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
-        </div>
-        <div>
-            <label for="start-date-filter" class="block text-xs font-medium text-gray-600 mb-1">Start date</label>
-            <input id="start-date-filter" type="date" name="start_date" value="{{ filter_start_date }}" class="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
-        </div>
-        <div>
-            <label for="end-date-filter" class="block text-xs font-medium text-gray-600 mb-1">End date</label>
-            <input id="end-date-filter" type="date" name="end_date" value="{{ filter_end_date }}" class="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
-        </div>
-        <div class="flex gap-2">
-            <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">Apply</button>
-            <a href="/expenses" class="rounded bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200">Clear</a>
-        </div>
-    </form>
-
     <div class="bg-white p-6 rounded-lg shadow border border-gray-100 space-y-4">
         <h2 class="text-lg font-semibold text-gray-900">AI Data Analyst</h2>
         <form id="ask-form" class="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <input id="question-input" type="text" name="question" placeholder="e.g. Which store did I visit the most?" class="md:col-span-4 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
-            <input id="ask-month-filter" type="month" name="month" value="{{ filter_month }}" class="rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
-            <input id="ask-start-date-filter" type="date" name="start_date" value="{{ filter_start_date }}" class="rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
-            <input id="ask-end-date-filter" type="date" name="end_date" value="{{ filter_end_date }}" class="rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
+            <input id="question-input" type="text" name="question" placeholder="e.g. What is my biggest spend category?" class="md:col-span-3 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
             <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">Ask</button>
         </form>
         <div id="insight-summary" class="text-sm text-gray-700"></div>
@@ -183,10 +161,7 @@
         event.preventDefault();
         const question = document.getElementById('question-input').value.trim();
         if (!question) return;
-        const month = (document.getElementById('ask-month-filter')?.value || '').trim();
-        const startDate = (document.getElementById('ask-start-date-filter')?.value || '').trim();
-        const endDate = (document.getElementById('ask-end-date-filter')?.value || '').trim();
-        const body = new URLSearchParams({ question, month, start_date: startDate, end_date: endDate });
+        const body = new URLSearchParams({ question });
         const response = await fetch('/api/insights/ask', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -221,15 +196,7 @@
         await refreshPinnedList();
     });
 
-    const chartParams = new URLSearchParams();
-    const initialMonth = (document.getElementById('month-filter')?.value || '').trim();
-    const initialStartDate = (document.getElementById('start-date-filter')?.value || '').trim();
-    const initialEndDate = (document.getElementById('end-date-filter')?.value || '').trim();
-    if (initialMonth) chartParams.set('month', initialMonth);
-    if (initialStartDate) chartParams.set('start_date', initialStartDate);
-    if (initialEndDate) chartParams.set('end_date', initialEndDate);
-
-    fetch(`/api/expenses/chart-data?${chartParams.toString()}`)
+    fetch('/api/expenses/chart-data')
         .then(response => response.json())
         .then(data => {
             const colors = ['#4f46e5', '#818cf8', '#c7d2fe', '#e0e7ff', '#312e81', '#6366f1'];
