@@ -11,7 +11,7 @@ from sqlalchemy import text, func, extract
 from app.core.config import settings
 from app.core.security import require_user_email
 from app.db.session import get_db
-from app.routers import expenses, upload
+from app.routers import expenses, insights, upload
 from app.models.expense import Expense
 
 app = FastAPI(
@@ -28,6 +28,7 @@ templates = Jinja2Templates(directory="app/templates")
 # Include our backend logic
 app.include_router(upload.router)
 app.include_router(expenses.router)
+app.include_router(insights.router)
 
 @app.get("/")
 def read_root(request: Request, db: Session = Depends(get_db)):

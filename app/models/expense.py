@@ -19,6 +19,7 @@ class Expense(Base):
     category = Column(String, default="Uncategorized")
     description = Column(String, nullable=True)
     receipt_url = Column(String, nullable=True)
+    source_type = Column(String, nullable=False, default="manual")
 
     items = relationship("ExpenseItem", back_populates="expense", cascade="all, delete-orphan")
 

@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.security import require_user_email
 from app.db.session import get_db
 from app.models.expense import Expense
+from app.models.saved_query import SavedQuery
 from app.services.finance import fx_service
 
 router = APIRouter()
@@ -44,7 +45,8 @@ async def confirm_expense(
         fx_rate=fx_rate,
         receipt_url=receipt_url,
         category=category,  # <--- NEW: Saving the AI's category to the database
-        description=f"Receipt from {vendor}"
+        description=f"Receipt from {vendor}",
+        source_type="manual",
     )
     db.add(new_expense)
     db.commit()
@@ -66,6 +68,12 @@ async def my_expenses(request: Request, db: Session = Depends(get_db)):
         context={
             "expenses": expenses,
             "base_currency": settings.BASE_CURRENCY,
+            "pinned_queries": (
+                db.query(SavedQuery)
+                .filter(SavedQuery.owner_email == user_email, SavedQuery.is_pinned.is_(True))
+                .order_by(SavedQuery.id.desc())
+                .all()
+            ),
         },
     )
 
@@ -115,7 +123,8 @@ async def get_chart_data(request: Request, db: Session = Depends(get_db)):
         return {
             "categories": {"labels": ["No Data"], "data": [1]},
             "vendors": {"labels": ["No Data"], "data": [1]},
-            "trend": {"labels": ["No Data"], "data": [1]}
+            "trend": {"labels": ["No Data"], "data": [1]},
+            "base_currency": settings.BASE_CURRENCY,
         }
 
     return {
