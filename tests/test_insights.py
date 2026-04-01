@@ -96,8 +96,16 @@ def test_insights_ask_save_and_pin_flow():
     assert pin_response.status_code == 200
 
     list_response = client.get("/api/insights/saved", headers=headers)
-    app.dependency_overrides.clear()
     assert list_response.status_code == 200
     rows = list_response.json()
     assert rows
     assert rows[0]["is_pinned"] is True
+
+    delete_response = client.delete(f"/api/insights/{saved_id}", headers=headers)
+    assert delete_response.status_code == 200
+
+    list_after_delete = client.get("/api/insights/saved", headers=headers)
+    app.dependency_overrides.clear()
+    assert list_after_delete.status_code == 200
+    rows_after_delete = list_after_delete.json()
+    assert rows_after_delete == []
