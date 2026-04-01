@@ -5,6 +5,18 @@ from dotenv import load_dotenv
 # 1. This line finds the local .env file and loads it into memory
 load_dotenv()
 
+
+def _parse_bool(value: str, default: bool) -> bool:
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
 class Settings:
     PROJECT_NAME: str = "Xpense Tracking Application"
     PROJECT_VERSION: str = "0.1.0"
@@ -20,6 +32,9 @@ class Settings:
     # 3. Security Config
     SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    AUTH_REQUIRED: bool = _parse_bool(os.getenv("AUTH_REQUIRED"), True)
+    BASE_CURRENCY: str = os.getenv("BASE_CURRENCY", "EUR").upper()
+    FX_API_URL: str = os.getenv("FX_API_URL", "https://api.frankfurter.app")
 
     # 4. Construct the Database URL dynamically
     @property

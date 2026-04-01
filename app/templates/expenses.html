@@ -11,6 +11,37 @@
         </div>
     </div>
 
+    <div class="bg-white p-6 rounded-lg shadow border border-gray-100 space-y-4">
+        <h2 class="text-lg font-semibold text-gray-900">AI Data Analyst</h2>
+        <form id="ask-form" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input id="question-input" type="text" name="question" placeholder="e.g. What is my biggest spend category?" class="md:col-span-3 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
+            <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">Ask</button>
+        </form>
+        <div id="insight-summary" class="text-sm text-gray-700"></div>
+        <div class="text-xs text-gray-500 break-all" id="insight-sql"></div>
+        <div class="relative h-64 w-full">
+            <canvas id="insightChart"></canvas>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <input id="save-name" type="text" placeholder="Saved view name" class="rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
+            <button id="save-btn" type="button" class="rounded bg-emerald-600 px-3 py-2 text-white hover:bg-emerald-700">Save Query</button>
+        </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow border border-gray-100">
+        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Pinned Insights</h3>
+        <ul id="pinned-list" class="space-y-2 text-sm">
+            {% for q in pinned_queries %}
+            <li class="flex items-center justify-between border rounded px-3 py-2">
+                <span class="font-medium text-gray-800">{{ q.name }}</span>
+                <span class="text-gray-500">{{ q.chart_type }}</span>
+            </li>
+            {% else %}
+            <li class="text-gray-500">No pinned insights yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
         <div class="bg-white p-6 rounded-lg shadow border border-gray-100 lg:col-span-2">
             <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Monthly Spending Trend</h2>
@@ -57,7 +88,10 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                            {{ expense.amount }} {{ expense.currency }}
+                            {{ "%.2f"|format(expense.base_currency_amount) }} {{ base_currency }}
+                            <div class="text-xs text-gray-500">
+                                {{ "%.2f"|format(expense.amount) }} {{ expense.currency }} @ {{ "%.4f"|format(expense.fx_rate) }}
+                            </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button hx-delete="/expenses/{{ expense.id }}" 
@@ -86,6 +120,82 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    let insightState = null;
+    let insightChart = null;
+
+    function renderInsightChart(chartData) {
+        const chartEl = document.getElementById('insightChart');
+        if (!chartEl || !chartData) return;
+        if (insightChart) insightChart.destroy();
+        insightChart = new Chart(chartEl.getContext('2d'), {
+            type: chartData.type || 'bar',
+            data: {
+                labels: chartData.labels || [],
+                datasets: [{
+                    label: 'Insight',
+                    data: chartData.values || [],
+                    backgroundColor: '#4f46e5',
+                    borderColor: '#4f46e5',
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    async function refreshPinnedList() {
+        const list = document.getElementById('pinned-list');
+        const response = await fetch('/api/insights/saved');
+        if (!response.ok || !list) return;
+        const rows = await response.json();
+        const pinned = rows.filter((row) => row.is_pinned);
+        if (!pinned.length) {
+            list.innerHTML = '<li class="text-gray-500">No pinned insights yet.</li>';
+            return;
+        }
+        list.innerHTML = pinned.map((row) => (
+            `<li class="flex items-center justify-between border rounded px-3 py-2"><span class="font-medium text-gray-800">${row.name}</span><span class="text-gray-500">${row.chart_type}</span></li>`
+        )).join('');
+    }
+
+    document.getElementById('ask-form')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const question = document.getElementById('question-input').value.trim();
+        if (!question) return;
+        const body = new URLSearchParams({ question });
+        const response = await fetch('/api/insights/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body,
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        insightState = data;
+        document.getElementById('insight-summary').innerText = data.summary || '';
+        document.getElementById('insight-sql').innerText = data.sql || '';
+        renderInsightChart(data.chart);
+    });
+    refreshPinnedList();
+
+    document.getElementById('save-btn')?.addEventListener('click', async () => {
+        if (!insightState) return;
+        const name = (document.getElementById('save-name').value || '').trim() || 'Saved Insight';
+        const saveBody = new URLSearchParams({
+            name,
+            question: insightState.question,
+            sql_query: insightState.sql,
+            chart_type: insightState.chart?.type || 'bar',
+        });
+        const saveResponse = await fetch('/api/insights/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: saveBody,
+        });
+        if (!saveResponse.ok) return;
+        const saved = await saveResponse.json();
+        await fetch(`/api/insights/${saved.id}/pin`, { method: 'POST' });
+        await refreshPinnedList();
+    });
+
     fetch('/api/expenses/chart-data')
         .then(response => response.json())
         .then(data => {
@@ -97,7 +207,7 @@
                 data: { 
                     labels: data.trend.labels, 
                     datasets: [{ 
-                        label: 'Total Spent (€)', 
+                        label: `Total Spent (${data.base_currency || 'EUR'})`,
                         data: data.trend.data, 
                         borderColor: '#4f46e5', 
                         backgroundColor: '#e0e7ff', 
@@ -138,7 +248,7 @@
                 data: { 
                     labels: data.vendors.labels, 
                     datasets: [{ 
-                        label: 'Spent (€)', 
+                        label: `Spent (${data.base_currency || 'EUR'})`,
                         data: data.vendors.data, 
                         backgroundColor: '#818cf8', 
                         borderRadius: 4 
