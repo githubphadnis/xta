@@ -13,14 +13,18 @@
 
     <div class="bg-white p-6 rounded-lg shadow border border-gray-100 space-y-4">
         <h2 class="text-lg font-semibold text-gray-900">AI Data Analyst</h2>
-        <form id="ask-form" class="grid grid-cols-1 md:grid-cols-6 gap-3">
-            <input id="question-input" type="text" name="question" placeholder="e.g. What is my biggest spend category?" class="md:col-span-3 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
             <input id="filter-month" type="month" value="{{ filter_month or '' }}" class="rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
             <input id="filter-start-date" type="date" value="{{ filter_start_date or '' }}" class="rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
+            <input id="filter-end-date" type="date" value="{{ filter_end_date or '' }}" class="rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
             <div class="flex gap-2">
-                <input id="filter-end-date" type="date" value="{{ filter_end_date or '' }}" class="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
                 <button id="apply-filters-btn" type="button" class="rounded bg-gray-700 px-3 py-2 text-white hover:bg-gray-800">Apply</button>
+                <a href="/expenses" class="rounded bg-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-300">Clear</a>
             </div>
+        </div>
+        <form id="ask-form" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input id="question-input" type="text" name="question" placeholder="e.g. What is my biggest spend category?" class="md:col-span-3 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
+            <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">Ask</button>
         </form>
         <div id="insight-summary" class="text-sm text-gray-700"></div>
         <div class="text-xs text-gray-500 break-all" id="insight-sql"></div>
@@ -172,7 +176,6 @@
         event.preventDefault();
         const question = document.getElementById('question-input').value.trim();
         if (!question) return;
-        const body = new URLSearchParams({ question });
         const body = new URLSearchParams({
             question,
             month: document.getElementById('filter-month')?.value || '',

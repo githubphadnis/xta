@@ -1,11 +1,12 @@
 import os
 from datetime import date, datetime, timedelta
-from fastapi import Depends, FastAPI, Request
+
+from fastapi import Depends, FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import text, func
 from sqlalchemy.orm import Session
-from sqlalchemy import text, func, extract
 
 from app.core.config import settings
 from app.core.security import require_user_email
@@ -30,27 +31,50 @@ app.include_router(expenses.router)
 app.include_router(insights.router)
 
 @app.get("/")
-def read_root(request: Request, db: Session = Depends(get_db)):
+def read_root(
+    request: Request,
+    month: str | None = Query(default=None),
+    start_date: str | None = Query(default=None),
+    end_date: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
     user_email = require_user_email(request)
-    # Get current month and year for filtering
-    current_month = datetime.now().month
-    current_year = datetime.now().year
+    parsed_start = None
+    parsed_end = None
+    if month:
+        try:
+            y, m = month.split("-", 1)
+            parsed_start = datetime.strptime(f"{y}-{m}-01", "%Y-%m-%d").date()
+            if int(m) == 12:
+                parsed_end = datetime.strptime(f"{int(y) + 1}-01-01", "%Y-%m-%d").date()
+            else:
+                parsed_end = datetime.strptime(f"{y}-{int(m) + 1:02d}-01", "%Y-%m-%d").date()
+        except Exception:
+            parsed_start = None
+            parsed_end = None
+    else:
+        try:
+            parsed_start = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
+            parsed_end = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
+        except ValueError:
+            parsed_start = None
+            parsed_end = None
 
-    # 1. Calculate Monthly Total
-    total_spent = db.query(func.sum(Expense.base_currency_amount)).filter(
-        Expense.owner_email == user_email,
-        extract('month', Expense.date) == current_month,
-        extract('year', Expense.date) == current_year
-    ).scalar() or 0.0
+    base_query = db.query(Expense).filter(Expense.owner_email == user_email)
+    if parsed_start:
+        base_query = base_query.filter(Expense.date >= parsed_start)
+    if parsed_end:
+        if month:
+            base_query = base_query.filter(Expense.date < parsed_end)
+        else:
+            base_query = base_query.filter(Expense.date <= parsed_end)
 
-    # 2. Count Monthly Receipts
-    recent_count = db.query(Expense).filter(
-        Expense.owner_email == user_email,
-        extract('month', Expense.date) == current_month,
-        extract('year', Expense.date) == current_year
-    ).count()
+    # 1) Selected range spend and count
+    total_spent = base_query.with_entities(func.sum(Expense.base_currency_amount)).scalar() or 0.0
+    recent_count = base_query.count()
+    avg_spent = (total_spent / recent_count) if recent_count > 0 else 0.0
 
-    # 3. Rolling 30-day and previous-30-day spend for quick trend context.
+    # 2) Rolling 30-day and previous-30-day spend for quick trend context.
     today = date.today()
     rolling_start = today - timedelta(days=30)
     previous_start = rolling_start - timedelta(days=30)
@@ -78,14 +102,22 @@ def read_root(request: Request, db: Session = Depends(get_db)):
     if previous_30d_spend > 0:
         spend_delta_pct = ((rolling_30d_spend - previous_30d_spend) / previous_30d_spend) * 100.0
 
-    # 4. Top category this month for a richer at-a-glance dashboard signal.
+    # 3) Top category in selected range
     top_category_row = (
         db.query(Expense.category, func.sum(Expense.base_currency_amount).label("amount"))
         .filter(
             Expense.owner_email == user_email,
-            extract('month', Expense.date) == current_month,
-            extract('year', Expense.date) == current_year,
         )
+    )
+    if parsed_start:
+        top_category_row = top_category_row.filter(Expense.date >= parsed_start)
+    if parsed_end:
+        if month:
+            top_category_row = top_category_row.filter(Expense.date < parsed_end)
+        else:
+            top_category_row = top_category_row.filter(Expense.date <= parsed_end)
+    top_category_row = (
+        top_category_row
         .group_by(Expense.category)
         .order_by(func.sum(Expense.base_currency_amount).desc())
         .first()
@@ -93,13 +125,9 @@ def read_root(request: Request, db: Session = Depends(get_db)):
     top_category_name = top_category_row[0] if top_category_row else "N/A"
     top_category_amount = float(top_category_row[1]) if top_category_row else 0.0
 
-    # 5. Get Recent Activity (Last 5 expenses)
+    # 4) Get Recent Activity (Last 5 expenses) in selected range
     recent_expenses = (
-        db.query(Expense)
-        .filter(Expense.owner_email == user_email)
-        .order_by(Expense.date.desc(), Expense.id.desc())
-        .limit(5)
-        .all()
+        base_query.order_by(Expense.date.desc(), Expense.id.desc()).limit(5).all()
     )
 
     return templates.TemplateResponse(
@@ -112,10 +140,15 @@ def read_root(request: Request, db: Session = Depends(get_db)):
             "recent_count": recent_count,
             "recent_expenses": recent_expenses,
             "base_currency": settings.BASE_CURRENCY,
+            "avg_spent": f"{avg_spent:.2f}",
+            "top_category": top_category_name,
+            "top_category_amount": f"{top_category_amount:.2f}",
             "rolling_30d_spend": f"{rolling_30d_spend:.2f}",
             "spend_delta_pct": f"{spend_delta_pct:.1f}",
-            "top_category_name": top_category_name,
-            "top_category_amount": f"{top_category_amount:.2f}",
+            "spend_delta_pct_value": spend_delta_pct,
+            "filter_month": month or "",
+            "filter_start_date": start_date or "",
+            "filter_end_date": end_date or "",
         },
     )
 
