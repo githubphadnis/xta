@@ -1,11 +1,9 @@
 import pandas as pd
 import json
 import io
-import math
 import os
 from openai import OpenAI
 from app.core.config import settings
-from datetime import datetime
 
 class StatementService:
     def __init__(self):
@@ -123,7 +121,7 @@ class StatementService:
                     "category": mapped_data.get("category", "Uncategorized")
                 }
                 expenses.append(expense)
-            except Exception as e:
+            except Exception:
                 continue 
 
         return expenses

@@ -57,7 +57,10 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                            {{ expense.amount }} {{ expense.currency }}
+                            {{ "%.2f"|format(expense.base_currency_amount) }} {{ base_currency }}
+                            <div class="text-xs text-gray-500">
+                                {{ "%.2f"|format(expense.amount) }} {{ expense.currency }} @ {{ "%.4f"|format(expense.fx_rate) }}
+                            </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button hx-delete="/expenses/{{ expense.id }}" 
@@ -97,7 +100,7 @@
                 data: { 
                     labels: data.trend.labels, 
                     datasets: [{ 
-                        label: 'Total Spent (€)', 
+                        label: `Total Spent (${data.base_currency || 'EUR'})`,
                         data: data.trend.data, 
                         borderColor: '#4f46e5', 
                         backgroundColor: '#e0e7ff', 
@@ -138,7 +141,7 @@
                 data: { 
                     labels: data.vendors.labels, 
                     datasets: [{ 
-                        label: 'Spent (€)', 
+                        label: `Spent (${data.base_currency || 'EUR'})`,
                         data: data.vendors.data, 
                         backgroundColor: '#818cf8', 
                         borderRadius: 4 

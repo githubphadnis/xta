@@ -7,8 +7,11 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.security import require_user_email
 from app.db.session import get_db
 from app.models.expense import Expense, ExpenseItem
+from app.services.finance import fx_service
 from app.services.ocr_service import ocr_service
 from app.services.statement_service import statement_service
 
@@ -51,7 +54,7 @@ async def _read_limited_file(file: UploadFile) -> bytes:
 
 @router.post("/upload", response_class=HTMLResponse)
 async def upload_file(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    _ = request
+    user_email = require_user_email(request)
     filename = (file.filename or "").lower().strip()
     if not filename:
         return _render_status_card("Error:", "Missing file name.")
@@ -82,19 +85,23 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
             except ValueError:
                 parsed_date = datetime.now().date()
 
-            amount = item.get("amount", 0.0)
+            amount = float(item.get("amount", 0.0))
+            currency = (item.get("currency") or settings.BASE_CURRENCY).upper()
             vendor = item.get("vendor", "Unknown")
+            base_currency_amount, fx_rate = fx_service.convert_to_base(amount, currency, parsed_date)
 
-            batch_key = (parsed_date, amount, vendor)
+            batch_key = (parsed_date, amount, currency, vendor)
             if batch_key in seen_in_batch:
                 duplicates_skipped += 1
                 continue
             seen_in_batch.add(batch_key)
 
             existing_expense = db.query(Expense).filter(
+                Expense.owner_email == user_email,
                 Expense.date == parsed_date,
                 Expense.amount == amount,
-                Expense.vendor == vendor
+                Expense.currency == currency,
+                Expense.vendor == vendor,
             ).first()
 
             if existing_expense:
@@ -102,12 +109,16 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
                 continue
 
             new_expense = Expense(
+                owner_email=user_email,
                 vendor=vendor,
                 date=parsed_date,
                 amount=amount,
-                currency=item.get("currency", "EUR"),
+                currency=currency,
+                base_currency_amount=base_currency_amount,
+                base_currency=settings.BASE_CURRENCY,
+                fx_rate=fx_rate,
                 category=item.get("category", "Uncategorized"),
-                description=item.get("description", "Bank Statement Import")
+                description=item.get("description", "Bank Statement Import"),
             )
             db_expenses.append(new_expense)
         
@@ -151,13 +162,17 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
         except ValueError:
             parsed_date = datetime.now().date()
 
-        amount = extracted_data.get("amount", 0.0)
+        amount = float(extracted_data.get("amount", 0.0))
+        currency = (extracted_data.get("currency") or settings.BASE_CURRENCY).upper()
         vendor = extracted_data.get("vendor", "Unknown")
+        base_currency_amount, fx_rate = fx_service.convert_to_base(amount, currency, parsed_date)
 
         existing_expense = db.query(Expense).filter(
+            Expense.owner_email == user_email,
             Expense.date == parsed_date,
             Expense.amount == amount,
-            Expense.vendor == vendor
+            Expense.currency == currency,
+            Expense.vendor == vendor,
         ).first()
 
         if existing_expense:
@@ -170,12 +185,16 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
             """
 
         new_expense = Expense(
+            owner_email=user_email,
             vendor=vendor,
             date=parsed_date,
             amount=amount,
-            currency=extracted_data.get("currency", "EUR"),
+            currency=currency,
+            base_currency_amount=base_currency_amount,
+            base_currency=settings.BASE_CURRENCY,
+            fx_rate=fx_rate,
             category=extracted_data.get("category", "Uncategorized"),
-            description=extracted_data.get("description", "")
+            description=extracted_data.get("description", ""),
         )
 
         items_list = extracted_data.get("items", [])
