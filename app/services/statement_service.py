@@ -1,7 +1,9 @@
-import pandas as pd
 import json
 import io
 import os
+from datetime import datetime
+
+import pandas as pd
 from openai import OpenAI
 from app.core.config import settings
 
@@ -15,6 +17,36 @@ class StatementService:
         else:
             self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
             self.model = "gpt-4o-mini"
+
+    @staticmethod
+    def _normalize_date(raw_date: object) -> str:
+        """
+        Normalize assorted spreadsheet date formats to YYYY-MM-DD.
+        Priority:
+        1) Strict ISO (YYYY-MM-DD) if already present.
+        2) General parser with dayfirst fallback.
+        3) Today if parsing fails.
+        """
+        text = str(raw_date).strip()
+        if not text or text.lower() in {"nan", "none"}:
+            return datetime.now().strftime("%Y-%m-%d")
+
+        try:
+            return datetime.strptime(text, "%Y-%m-%d").strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+
+        # Dot/slash separated formats are typically day-first in EU exports.
+        dayfirst_hint = any(sep in text for sep in (".", "/"))
+        parsed = pd.to_datetime(text, dayfirst=dayfirst_hint, errors="coerce")
+        if pd.notna(parsed):
+            return parsed.strftime("%Y-%m-%d")
+
+        parsed_dayfirst = pd.to_datetime(text, dayfirst=True, errors="coerce")
+        if pd.notna(parsed_dayfirst):
+            return parsed_dayfirst.strftime("%Y-%m-%d")
+
+        return datetime.now().strftime("%Y-%m-%d")
 
     def _clean_json_response(self, raw_content: str) -> dict:
         raw_content = raw_content.strip()
@@ -115,7 +147,7 @@ class StatementService:
                 
                 expense = {
                     "vendor": mapped_data.get("vendor", raw_vendor_name),
-                    "date": pd.to_datetime(row[date_col], dayfirst=True, errors='coerce').strftime('%Y-%m-%d'),
+                    "date": self._normalize_date(row[date_col]),
                     "amount": abs(amount),
                     "currency": "EUR", 
                     "category": mapped_data.get("category", "Uncategorized")
@@ -124,6 +156,56 @@ class StatementService:
             except Exception:
                 continue 
 
+        return expenses
+
+    @staticmethod
+    def parse_fallback_unstructured(file_contents: bytes, filename: str) -> list:
+        """
+        Best-effort fallback parser for unstructured sheets:
+        - extracts numeric values
+        - creates pseudo transactions with generic metadata
+        """
+        try:
+            if filename.lower().endswith(".csv"):
+                df = pd.read_csv(io.BytesIO(file_contents), header=None, dtype=str, encoding_errors="replace")
+            else:
+                df = pd.read_excel(io.BytesIO(file_contents), header=None, dtype=str)
+        except Exception:
+            return []
+
+        expenses: list[dict] = []
+        for _, row in df.iterrows():
+            cells = [str(value).strip() for value in row.tolist() if str(value).strip() not in {"", "nan", "None"}]
+            if not cells:
+                continue
+            amount = None
+            for value in cells:
+                normalized = value.replace(",", ".").replace(" ", "")
+                try:
+                    parsed = float(normalized)
+                except ValueError:
+                    continue
+                if parsed < 0:
+                    amount = abs(parsed)
+                    break
+                if parsed > 0 and amount is None:
+                    amount = parsed
+            if amount is None:
+                continue
+
+            vendor = next((c for c in cells if any(ch.isalpha() for ch in c)), "Unstructured Import")
+            expenses.append(
+                {
+                    "vendor": vendor[:120],
+                    "date": pd.Timestamp.now().strftime("%Y-%m-%d"),
+                    "amount": float(amount),
+                    "currency": "EUR",
+                    "category": "Uncategorized",
+                    "description": "Unstructured statement fallback",
+                }
+            )
+            if len(expenses) >= 500:
+                break
         return expenses
 
 statement_service = StatementService()

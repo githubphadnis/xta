@@ -2,20 +2,83 @@
 
 {% block content %}
 <div class="space-y-6">
-    
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    <form method="get" action="/" class="bg-white rounded-lg border border-gray-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Month</label>
+            <input type="month" name="month" value="{{ filter_month }}" class="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Start date</label>
+            <input type="date" name="start_date" value="{{ filter_start_date }}" class="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">End date</label>
+            <input type="date" name="end_date" value="{{ filter_end_date }}" class="w-full rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="rounded bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-700">Apply</button>
+            <a href="/" class="rounded bg-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-300">Clear</a>
+        </div>
+    </form>
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <dt class="text-sm font-medium text-gray-500 truncate">Total Spent (This Month)</dt>
-                <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ base_currency }} {{ total_spent }}</dd>
+                <dt class="text-xs font-medium text-gray-500 uppercase">Selected Spend</dt>
+                <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ base_currency }} {{ total_spent }}</dd>
             </div>
         </div>
-        
         <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <dt class="text-sm font-medium text-gray-500 truncate">Receipts (This Month)</dt>
-                <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ recent_count }}</dd>
+                <dt class="text-xs font-medium text-gray-500 uppercase">Transactions</dt>
+                <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ recent_count }}</dd>
             </div>
+        </div>
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <dt class="text-xs font-medium text-gray-500 uppercase">Average Ticket</dt>
+                <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ base_currency }} {{ avg_spent }}</dd>
+            </div>
+        </div>
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <dt class="text-xs font-medium text-gray-500 uppercase">Top Category</dt>
+                <dd class="mt-1 text-xl font-semibold text-gray-900">{{ top_category_name }}</dd>
+                <p class="text-sm text-gray-500 mt-1">{{ base_currency }} {{ top_category_amount }}</p>
+            </div>
+        </div>
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <dt class="text-xs font-medium text-gray-500 uppercase">MoM (30d)</dt>
+                <dd class="mt-1 text-2xl font-semibold {% if spend_delta_pct_value >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+                    {{ spend_delta_pct }}%
+                </dd>
+                <p class="text-xs text-gray-500 mt-1">{{ base_currency }} {{ rolling_30d_spend }} vs {{ previous_30d_spend }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="bg-white rounded-lg border border-gray-100 p-4 lg:col-span-2">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Monthly Trend (last 12 months)</h3>
+            <div class="h-56"><canvas id="dashboardTrendChart"></canvas></div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-100 p-4">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Quick Stats</h3>
+            <dl class="space-y-3">
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-500">12m Spend</dt>
+                    <dd class="font-semibold text-gray-900">{{ base_currency }} {{ spend_12m_total }}</dd>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-500">12m Monthly Avg</dt>
+                    <dd class="font-semibold text-gray-900">{{ base_currency }} {{ avg_12m_monthly }}</dd>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <dt class="text-gray-500">Most Recent Month</dt>
+                    <dd class="font-semibold text-gray-900">{{ latest_month_label }}</dd>
+                </div>
+            </dl>
         </div>
     </div>
 
@@ -110,8 +173,41 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     console.log("Dashboard script loaded");
+
+    async function loadDashboardTrend() {
+        const params = new URLSearchParams(window.location.search);
+        const response = await fetch(`/api/expenses/chart-data?${params.toString()}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const trend = data?.trend || { labels: [], data: [] };
+        const chartEl = document.getElementById('dashboardTrendChart');
+        if (!chartEl) return;
+        new Chart(chartEl.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: trend.labels,
+                datasets: [{
+                    label: `Spent (${data.base_currency || '{{ base_currency }}'})`,
+                    data: trend.data,
+                    borderColor: '#4f46e5',
+                    backgroundColor: '#e0e7ff',
+                    fill: true,
+                    tension: 0.35,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } },
+            },
+        });
+    }
+
+    loadDashboardTrend();
 
     const dropZone = document.getElementById('upload-area');
     const fileInput = document.getElementById('file-upload');

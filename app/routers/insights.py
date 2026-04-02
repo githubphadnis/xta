@@ -13,10 +13,20 @@ router = APIRouter(prefix="/api/insights", tags=["insights"])
 async def ask_question(
     request: Request,
     question: str = Form(...),
+    month: str = Form(default=""),
+    start_date: str = Form(default=""),
+    end_date: str = Form(default=""),
     db: Session = Depends(get_db),
 ):
     user_email = require_user_email(request)
-    result = query_service.answer_question(db=db, owner_email=user_email, question=question)
+    result = query_service.answer_question(
+        db=db,
+        owner_email=user_email,
+        question=question,
+        month=month or None,
+        start_date=start_date or None,
+        end_date=end_date or None,
+    )
     return {
         "question": result.question,
         "summary": result.summary,
@@ -68,6 +78,8 @@ async def pin_saved_query(saved_query_id: int, request: Request, db: Session = D
     return {"id": saved.id, "status": "pinned"}
 
 
+
+
 @router.get("/saved")
 async def list_saved_queries(request: Request, db: Session = Depends(get_db)):
     user_email = require_user_email(request)
@@ -88,3 +100,18 @@ async def list_saved_queries(request: Request, db: Session = Depends(get_db)):
         }
         for row in rows
     ]
+
+
+@router.delete("/{saved_query_id}")
+async def delete_saved_query(saved_query_id: int, request: Request, db: Session = Depends(get_db)):
+    user_email = require_user_email(request)
+    saved = (
+        db.query(SavedQuery)
+        .filter(SavedQuery.id == saved_query_id, SavedQuery.owner_email == user_email)
+        .first()
+    )
+    if not saved:
+        raise HTTPException(status_code=404, detail="Saved query not found")
+    db.delete(saved)
+    db.commit()
+    return {"id": saved_query_id, "status": "deleted"}
