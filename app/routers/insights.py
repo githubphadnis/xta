@@ -16,9 +16,13 @@ async def ask_question(
     month: str = Form(default=""),
     start_date: str = Form(default=""),
     end_date: str = Form(default=""),
+    intent: str = Form(default=""),
     db: Session = Depends(get_db),
 ):
     user_email = require_user_email(request)
+    safe_intent = (intent or "").strip().lower()
+    if safe_intent and safe_intent not in {"visits", "spend_by_category", "spend_by_vendor", "monthly_trend", "category_split"}:
+        raise HTTPException(status_code=400, detail="Unsupported intent.")
     result = query_service.answer_question(
         db=db,
         owner_email=user_email,
@@ -26,9 +30,11 @@ async def ask_question(
         month=month or None,
         start_date=start_date or None,
         end_date=end_date or None,
+        intent=safe_intent or None,
     )
     return {
         "question": result.question,
+        "intent": result.intent,
         "summary": result.summary,
         "sql": result.sql_query,
         "chart": {

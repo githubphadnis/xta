@@ -20,3 +20,11 @@ def test_normalize_date_falls_back_to_today_for_invalid() -> None:
     # Ensure stable format.
     assert len(parsed) == 10
     assert parsed.count("-") == 2
+
+
+def test_parse_fallback_unstructured_extracts_amounts() -> None:
+    csv_bytes = b"foo,bar,baz\nStore Alpha,,12.50\n,Random text,7\n"
+    rows = StatementService.parse_fallback_unstructured(csv_bytes, "sample.csv")
+    assert rows
+    assert rows[0]["vendor"].startswith("Store")
+    assert rows[0]["amount"] == 12.5

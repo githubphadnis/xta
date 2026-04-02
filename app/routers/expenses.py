@@ -93,6 +93,7 @@ async def my_expenses(
         request=request,
         name="expenses.html",
         context={
+            "request": request,
             "expenses": expenses,
             "base_currency": settings.BASE_CURRENCY,
             "pinned_queries": (
@@ -104,6 +105,7 @@ async def my_expenses(
             "filter_month": month or "",
             "filter_start_date": start_date or "",
             "filter_end_date": end_date or "",
+            "app_version": settings.PROJECT_VERSION,
         },
     )
 

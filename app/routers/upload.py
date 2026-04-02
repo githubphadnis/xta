@@ -164,12 +164,20 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
             return _render_status_card("Error:", str(exc))
 
         # Send to the Pandas / AI Mapper Service
-        expenses_data = statement_service.process_file(contents, filename)
+        process_result = statement_service.process_file(contents, filename)
+        expenses_data = process_result.get("rows", [])
+        meta = process_result.get("meta", {})
+        parser_mode = meta.get("source", "unknown")
+        skipped_rows = int(meta.get("skipped_rows", 0))
+        parsed_rows = int(meta.get("parsed_rows", len(expenses_data)))
+        total_rows = int(meta.get("total_rows", len(expenses_data)))
+        confidence = str(meta.get("confidence", "unknown"))
+        fallback_used = bool(meta.get("fallback_used", False))
+        error_text = process_result.get("error")
 
         # Handle Errors
-        if not expenses_data or (isinstance(expenses_data, list) and "error" in expenses_data[0]):
-            error_msg = expenses_data[0].get("error", "Failed to parse spreadsheet.") if expenses_data else "No data found."
-            return _render_status_card("Error:", error_msg)
+        if error_text and not expenses_data:
+            return _render_status_card("Error:", error_text)
 
         db_expenses = []
         duplicates_skipped = 0
@@ -226,11 +234,30 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
             db.commit()
 
         dup_msg = f"<br><span class='text-sm text-green-700 font-bold'>Skipped {duplicates_skipped} duplicates.</span>" if duplicates_skipped > 0 else ""
+        parse_msg = (
+            f"<br><span class='text-sm text-gray-700'>"
+            f"Ingest confidence: {confidence.upper()} &middot; Mode: {parser_mode} &middot; "
+            f"Parsed {parsed_rows}/{total_rows}, skipped {skipped_rows}."
+            f"</span>"
+        )
+        fallback_msg = (
+            "<br><span class='text-sm text-amber-700 font-medium'>Fallback parser was used for part/all of this file.</span>"
+            if fallback_used
+            else ""
+        )
+        warn_msg = (
+            f"<br><span class='text-sm text-yellow-700'>Note: {_escape(error_text)}</span>"
+            if error_text
+            else ""
+        )
 
         return f"""
         <div class="p-12 text-center bg-green-50 rounded-lg border-2 border-green-500 border-dashed">
             <h3 class="text-lg font-medium text-green-800">Imported {len(db_expenses)} transactions!</h3>
             {dup_msg}
+            {parse_msg}
+            {fallback_msg}
+            {warn_msg}
             <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Refresh</button>
         </div>
         """

@@ -22,7 +22,15 @@
                 <a href="/expenses" class="rounded bg-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-300">Clear</a>
             </div>
         </div>
-        <form id="ask-form" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <form id="ask-form" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <select id="intent-select" class="rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+                <option value="">Auto intent</option>
+                <option value="spend_by_category">Spend by category</option>
+                <option value="spend_by_vendor">Spend by vendor</option>
+                <option value="visits">Most visited vendors</option>
+                <option value="monthly_trend">Monthly trend</option>
+                <option value="category_split">Category split</option>
+            </select>
             <input id="question-input" type="text" name="question" placeholder="e.g. What is my biggest spend category?" class="md:col-span-3 rounded border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" />
             <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">Ask</button>
         </form>
@@ -156,16 +164,16 @@
         const response = await fetch('/api/insights/saved');
         if (!response.ok || !list) return;
         const rows = await response.json();
-        const pinned = rows.filter((row) => row.is_pinned);
-        if (!pinned.length) {
+        if (!rows.length) {
             list.innerHTML = '<li class="text-gray-500">No pinned insights yet.</li>';
             return;
         }
-        list.innerHTML = pinned.map((row) => (
+        list.innerHTML = rows.map((row) => (
             `<li class="flex items-center justify-between border rounded px-3 py-2">
                 <div class="flex items-center gap-3">
                     <span class="font-medium text-gray-800">${row.name}</span>
                     <span class="text-gray-500">${row.chart_type}</span>
+                    ${row.is_pinned ? '<span class="text-xs rounded bg-indigo-100 text-indigo-700 px-2 py-0.5">Pinned</span>' : ''}
                 </div>
                 <button type="button" data-delete-id="${row.id}" class="delete-saved-query rounded bg-red-100 px-2 py-1 text-xs text-red-700 hover:bg-red-200">Delete</button>
             </li>`
@@ -181,6 +189,7 @@
             month: document.getElementById('filter-month')?.value || '',
             start_date: document.getElementById('filter-start-date')?.value || '',
             end_date: document.getElementById('filter-end-date')?.value || '',
+            intent: document.getElementById('intent-select')?.value || '',
         });
         const response = await fetch('/api/insights/ask', {
             method: 'POST',

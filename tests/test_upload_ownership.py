@@ -38,6 +38,7 @@ def test_expenses_endpoint_is_scoped_to_user():
                 date=date(2026, 1, 1),
                 category="Groceries",
                 description="",
+                source_type="manual",
             ),
             Expense(
                 owner_email="bob@example.com",
@@ -50,6 +51,7 @@ def test_expenses_endpoint_is_scoped_to_user():
                 date=date(2026, 1, 2),
                 category="Dining",
                 description="",
+                source_type="manual",
             ),
         ]
     )
