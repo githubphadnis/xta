@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.parsing import parse_iso_date
 from app.core.security import require_user_email
 from app.db.session import get_db
 from app.models.expense import Expense, ExpenseItem
@@ -185,11 +186,7 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
 
         for item in expenses_data:
             date_str = item.get("date", datetime.now().strftime("%Y-%m-%d"))
-            try:
-                parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-            except ValueError:
-                # Prefer row-level date if parse failed, otherwise use today.
-                parsed_date = datetime.now().date()
+            parsed_date = parse_iso_date(date_str) or datetime.now().date()
 
             amount = float(item.get("amount", 0.0))
             currency = (item.get("currency") or settings.BASE_CURRENCY).upper()
@@ -283,10 +280,7 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
             return _render_status_card("Extraction Error:", extracted_data["error"])
 
         date_str = extracted_data.get("date", datetime.now().strftime("%Y-%m-%d"))
-        try:
-            parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-        except ValueError:
-            parsed_date = datetime.now().date()
+        parsed_date = parse_iso_date(date_str) or datetime.now().date()
 
         amount = float(extracted_data.get("amount", 0.0))
         currency = (extracted_data.get("currency") or settings.BASE_CURRENCY).upper()

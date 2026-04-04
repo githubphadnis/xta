@@ -1,11 +1,11 @@
-import json
 import io
+import json
 import os
-from datetime import datetime
 
 import pandas as pd
 from openai import OpenAI
 from app.core.config import settings
+from app.core.parsing import normalize_date_string
 
 class StatementService:
     def __init__(self):
@@ -27,26 +27,7 @@ class StatementService:
         2) General parser with dayfirst fallback.
         3) Today if parsing fails.
         """
-        text = str(raw_date).strip()
-        if not text or text.lower() in {"nan", "none"}:
-            return datetime.now().strftime("%Y-%m-%d")
-
-        try:
-            return datetime.strptime(text, "%Y-%m-%d").strftime("%Y-%m-%d")
-        except ValueError:
-            pass
-
-        # Dot/slash separated formats are typically day-first in EU exports.
-        dayfirst_hint = any(sep in text for sep in (".", "/"))
-        parsed = pd.to_datetime(text, dayfirst=dayfirst_hint, errors="coerce")
-        if pd.notna(parsed):
-            return parsed.strftime("%Y-%m-%d")
-
-        parsed_dayfirst = pd.to_datetime(text, dayfirst=True, errors="coerce")
-        if pd.notna(parsed_dayfirst):
-            return parsed_dayfirst.strftime("%Y-%m-%d")
-
-        return datetime.now().strftime("%Y-%m-%d")
+        return normalize_date_string(raw_date)
 
     def _clean_json_response(self, raw_content: str) -> dict:
         raw_content = raw_content.strip()

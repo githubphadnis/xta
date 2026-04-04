@@ -1,6 +1,20 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% macro info_badge(message, id) -%}
+<span class="relative inline-flex items-center" data-tooltip-wrapper="{{ id }}">
+    <button
+        type="button"
+        class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-[10px] font-bold text-gray-500 hover:bg-gray-100"
+        aria-label="Info"
+        data-tooltip-target="{{ id }}"
+    >i</button>
+    <span
+        id="{{ id }}"
+        class="pointer-events-none absolute left-1/2 top-5 z-20 hidden w-56 -translate-x-1/2 rounded bg-gray-900 px-2 py-1 text-[11px] font-normal normal-case text-white shadow-lg"
+    >{{ message }}</span>
+</span>
+{%- endmacro %}
 <div class="space-y-6">
     <form method="get" action="/" class="bg-white rounded-lg border border-gray-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <div>
@@ -24,36 +38,51 @@
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <dt class="text-xs font-medium text-gray-500 uppercase">Selected Spend</dt>
-                <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ base_currency }} {{ total_spent }}</dd>
+                <dt class="text-xs font-medium text-gray-500 uppercase flex items-center gap-1">
+                    Selected Spend
+                    {{ info_badge("Total spend within current filter range, converted to base currency.", "tip-selected-spend") }}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ base_currency }} {{ total_spent_display }}</dd>
             </div>
         </div>
         <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <dt class="text-xs font-medium text-gray-500 uppercase">Transactions</dt>
+                <dt class="text-xs font-medium text-gray-500 uppercase flex items-center gap-1">
+                    Transactions
+                    {{ info_badge("Number of expense records in the selected filter range.", "tip-transactions") }}
+                </dt>
                 <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ recent_count }}</dd>
             </div>
         </div>
         <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <dt class="text-xs font-medium text-gray-500 uppercase">Average Ticket</dt>
-                <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ base_currency }} {{ avg_spent }}</dd>
+                <dt class="text-xs font-medium text-gray-500 uppercase flex items-center gap-1">
+                    Average Ticket
+                    {{ info_badge("Average spend per transaction in base currency for selected filters.", "tip-avg-ticket") }}
+                </dt>
+                <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ base_currency }} {{ avg_spent_display }}</dd>
             </div>
         </div>
         <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <dt class="text-xs font-medium text-gray-500 uppercase">Top Category</dt>
+                <dt class="text-xs font-medium text-gray-500 uppercase flex items-center gap-1">
+                    Top Category
+                    {{ info_badge("Category with highest total spend in current filter range.", "tip-top-category") }}
+                </dt>
                 <dd class="mt-1 text-xl font-semibold text-gray-900">{{ top_category_name }}</dd>
-                <p class="text-sm text-gray-500 mt-1">{{ base_currency }} {{ top_category_amount }}</p>
+                <p class="text-sm text-gray-500 mt-1">{{ base_currency }} {{ top_category_amount_display }}</p>
             </div>
         </div>
         <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <dt class="text-xs font-medium text-gray-500 uppercase">MoM (30d)</dt>
+                <dt class="text-xs font-medium text-gray-500 uppercase flex items-center gap-1">
+                    MoM (30d)
+                    {{ info_badge("Percent change: rolling last 30 days vs previous 30 days.", "tip-mom") }}
+                </dt>
                 <dd class="mt-1 text-2xl font-semibold {% if spend_delta_pct_value >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
-                    {{ spend_delta_pct }}%
+                    {{ spend_delta_pct_display }}%
                 </dd>
-                <p class="text-xs text-gray-500 mt-1">{{ base_currency }} {{ rolling_30d_spend }} vs {{ previous_30d_spend }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ base_currency }} {{ rolling_30d_spend_display }} vs {{ previous_30d_spend_display }}</p>
             </div>
         </div>
     </div>
@@ -68,11 +97,11 @@
             <dl class="space-y-3">
                 <div class="flex justify-between text-sm">
                     <dt class="text-gray-500">12m Spend</dt>
-                    <dd class="font-semibold text-gray-900">{{ base_currency }} {{ spend_12m_total }}</dd>
+                    <dd class="font-semibold text-gray-900">{{ base_currency }} {{ spend_12m_total_display }}</dd>
                 </div>
                 <div class="flex justify-between text-sm">
                     <dt class="text-gray-500">12m Monthly Avg</dt>
-                    <dd class="font-semibold text-gray-900">{{ base_currency }} {{ avg_12m_monthly }}</dd>
+                    <dd class="font-semibold text-gray-900">{{ base_currency }} {{ avg_12m_monthly_display }}</dd>
                 </div>
                 <div class="flex justify-between text-sm">
                     <dt class="text-gray-500">Most Recent Month</dt>
@@ -129,7 +158,7 @@
                                 <span class="text-sm text-gray-500">{{ expense.date.strftime('%b %d, %Y') }} &middot; {{ expense.category }}</span>
                             </div>
                             <div class="text-sm font-semibold text-gray-900">
-                                {{ expense.amount }} {{ expense.currency }}
+                                {{ "%.2f"|format(expense.amount) }} {{ expense.currency }}
                             </div>
                         </div>
 
@@ -208,6 +237,18 @@
     }
 
     loadDashboardTrend();
+    document.querySelectorAll('[data-tooltip-wrapper]').forEach((wrapper) => {
+        const trigger = wrapper.querySelector('button[data-tooltip-target]');
+        const tooltipId = trigger?.getAttribute('data-tooltip-target');
+        const tooltip = tooltipId ? document.getElementById(tooltipId) : null;
+        if (!trigger || !tooltip) return;
+        const show = () => tooltip.classList.remove('hidden');
+        const hide = () => tooltip.classList.add('hidden');
+        trigger.addEventListener('mouseenter', show);
+        trigger.addEventListener('mouseleave', hide);
+        trigger.addEventListener('focus', show);
+        trigger.addEventListener('blur', hide);
+    });
 
     const dropZone = document.getElementById('upload-area');
     const fileInput = document.getElementById('file-upload');

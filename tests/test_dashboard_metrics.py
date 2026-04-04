@@ -75,3 +75,5 @@ def test_dashboard_renders_richer_metrics():
     assert "12m Spend" in response.text
     assert "12m Monthly Avg" in response.text
     assert "Version 0.1.0" in response.text
+    assert "Total spend within current filter range, converted to base currency." in response.text
+    assert "EUR 50.00" in response.text
