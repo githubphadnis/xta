@@ -1,5 +1,5 @@
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.responses import JSONResponse
@@ -43,13 +43,32 @@ def read_root(
     db: Session = Depends(get_db),
 ):
     user_email = require_user_email(request)
-    parsed_start, parsed_end, month_mode = parse_filter_dates(month=month, start_date=start_date, end_date=end_date)
+    parsed_start = None
+    parsed_end = None
+    if month:
+        try:
+            y, m = month.split("-", 1)
+            parsed_start = datetime.strptime(f"{y}-{m}-01", "%Y-%m-%d").date()
+            if int(m) == 12:
+                parsed_end = datetime.strptime(f"{int(y) + 1}-01-01", "%Y-%m-%d").date()
+            else:
+                parsed_end = datetime.strptime(f"{y}-{int(m) + 1:02d}-01", "%Y-%m-%d").date()
+        except Exception:
+            parsed_start = None
+            parsed_end = None
+    else:
+        try:
+            parsed_start = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
+            parsed_end = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
+        except ValueError:
+            parsed_start = None
+            parsed_end = None
 
     base_query = db.query(Expense).filter(Expense.owner_email == user_email)
     if parsed_start:
         base_query = base_query.filter(Expense.date >= parsed_start)
     if parsed_end:
-        if month_mode:
+        if month:
             base_query = base_query.filter(Expense.date < parsed_end)
         else:
             base_query = base_query.filter(Expense.date <= parsed_end)
@@ -97,7 +116,7 @@ def read_root(
     if parsed_start:
         top_category_row = top_category_row.filter(Expense.date >= parsed_start)
     if parsed_end:
-        if month_mode:
+        if month:
             top_category_row = top_category_row.filter(Expense.date < parsed_end)
         else:
             top_category_row = top_category_row.filter(Expense.date <= parsed_end)
@@ -110,16 +129,9 @@ def read_root(
     top_category_name = top_category_row[0] if top_category_row else "N/A"
     top_category_amount = float(top_category_row[1]) if top_category_row else 0.0
 
-    # 4) 12-month summary and most recent month label for quick stats panel.
-    twelve_month_start = today - timedelta(days=365)
-    recent_year_rows = (
-        db.query(Expense.date, Expense.base_currency_amount)
-        .filter(
-            Expense.owner_email == user_email,
-            Expense.date >= twelve_month_start,
-            Expense.date <= today,
-        )
-        .all()
+    # 4) Get Recent Activity (Last 5 expenses) in selected range
+    recent_expenses = (
+        base_query.order_by(Expense.date.desc(), Expense.id.desc()).limit(5).all()
     )
     monthly_rollup: dict[str, float] = {}
     for tx_date, tx_amount in recent_year_rows:
@@ -145,28 +157,15 @@ def read_root(
             "recent_count": recent_count,
             "recent_expenses": recent_expenses,
             "base_currency": settings.BASE_CURRENCY,
-            "avg_spent": avg_spent,
-            "avg_spent_display": f"{avg_spent:.2f}",
+            "avg_spent": f"{avg_spent:.2f}",
             "top_category": top_category_name,
-            "top_category_name": top_category_name,
-            "top_category_amount": top_category_amount,
-            "top_category_amount_display": f"{top_category_amount:.2f}",
-            "rolling_30d_spend": rolling_30d_spend,
-            "rolling_30d_spend_display": f"{rolling_30d_spend:.2f}",
+            "top_category_amount": f"{top_category_amount:.2f}",
+            "rolling_30d_spend": f"{rolling_30d_spend:.2f}",
             "spend_delta_pct": f"{spend_delta_pct:.1f}",
-            "spend_delta_pct_display": f"{spend_delta_pct:.1f}",
             "spend_delta_pct_value": spend_delta_pct,
-            "previous_30d_spend": previous_30d_spend,
-            "previous_30d_spend_display": f"{previous_30d_spend:.2f}",
-            "spend_12m_total": spend_12m_total,
-            "spend_12m_total_display": f"{spend_12m_total:.2f}",
-            "avg_12m_monthly": avg_12m_monthly,
-            "avg_12m_monthly_display": f"{avg_12m_monthly:.2f}",
-            "latest_month_label": latest_month_label,
             "filter_month": month or "",
             "filter_start_date": start_date or "",
             "filter_end_date": end_date or "",
-            "app_version": settings.PROJECT_VERSION,
         },
     )
 

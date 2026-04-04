@@ -186,7 +186,11 @@ async def upload_file(request: Request, file: UploadFile = File(...), db: Sessio
 
         for item in expenses_data:
             date_str = item.get("date", datetime.now().strftime("%Y-%m-%d"))
-            parsed_date = parse_iso_date(date_str) or datetime.now().date()
+            try:
+                parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                # Prefer row-level date if parse failed, otherwise use today.
+                parsed_date = datetime.now().date()
 
             amount = float(item.get("amount", 0.0))
             currency = (item.get("currency") or settings.BASE_CURRENCY).upper()
