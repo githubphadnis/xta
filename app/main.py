@@ -1,5 +1,5 @@
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.responses import JSONResponse
@@ -9,7 +9,6 @@ from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.parsing import parse_filter_dates
 from app.core.security import require_user_email
 from app.db.session import get_db
 from app.routers import expenses, insights, upload
@@ -45,21 +44,26 @@ def read_root(
     user_email = require_user_email(request)
     parsed_start = None
     parsed_end = None
+    month_mode = False
     if month:
         try:
-            y, m = month.split("-", 1)
-            parsed_start = datetime.strptime(f"{y}-{m}-01", "%Y-%m-%d").date()
-            if int(m) == 12:
-                parsed_end = datetime.strptime(f"{int(y) + 1}-01-01", "%Y-%m-%d").date()
+            year_part, month_part = month.split("-", 1)
+            year = int(year_part)
+            month_num = int(month_part)
+            parsed_start = date(year, month_num, 1)
+            if month_num == 12:
+                parsed_end = date(year + 1, 1, 1)
             else:
-                parsed_end = datetime.strptime(f"{y}-{int(m) + 1:02d}-01", "%Y-%m-%d").date()
+                parsed_end = date(year, month_num + 1, 1)
+            month_mode = True
         except Exception:
             parsed_start = None
             parsed_end = None
+            month_mode = False
     else:
         try:
-            parsed_start = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
-            parsed_end = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
+            parsed_start = date.fromisoformat(start_date) if start_date else None
+            parsed_end = date.fromisoformat(end_date) if end_date else None
         except ValueError:
             parsed_start = None
             parsed_end = None
@@ -68,7 +72,7 @@ def read_root(
     if parsed_start:
         base_query = base_query.filter(Expense.date >= parsed_start)
     if parsed_end:
-        if month:
+        if month_mode:
             base_query = base_query.filter(Expense.date < parsed_end)
         else:
             base_query = base_query.filter(Expense.date <= parsed_end)
@@ -116,7 +120,7 @@ def read_root(
     if parsed_start:
         top_category_row = top_category_row.filter(Expense.date >= parsed_start)
     if parsed_end:
-        if month:
+        if month_mode:
             top_category_row = top_category_row.filter(Expense.date < parsed_end)
         else:
             top_category_row = top_category_row.filter(Expense.date <= parsed_end)
@@ -129,11 +133,17 @@ def read_root(
     top_category_name = top_category_row[0] if top_category_row else "N/A"
     top_category_amount = float(top_category_row[1]) if top_category_row else 0.0
 
-    # 4) Get Recent Activity (Last 5 expenses) in selected range
-    recent_expenses = (
-        base_query.order_by(Expense.date.desc(), Expense.id.desc()).limit(5).all()
-    )
     monthly_rollup: dict[str, float] = {}
+    twelve_month_start = today - timedelta(days=365)
+    recent_year_rows = (
+        db.query(Expense.date, Expense.base_currency_amount)
+        .filter(
+            Expense.owner_email == user_email,
+            Expense.date >= twelve_month_start,
+            Expense.date <= today,
+        )
+        .all()
+    )
     for tx_date, tx_amount in recent_year_rows:
         key = tx_date.strftime("%Y-%m")
         monthly_rollup[key] = monthly_rollup.get(key, 0.0) + float(tx_amount or 0.0)
@@ -157,15 +167,28 @@ def read_root(
             "recent_count": recent_count,
             "recent_expenses": recent_expenses,
             "base_currency": settings.BASE_CURRENCY,
-            "avg_spent": f"{avg_spent:.2f}",
+            "avg_spent": avg_spent,
+            "avg_spent_display": f"{avg_spent:.2f}",
             "top_category": top_category_name,
-            "top_category_amount": f"{top_category_amount:.2f}",
-            "rolling_30d_spend": f"{rolling_30d_spend:.2f}",
+            "top_category_name": top_category_name,
+            "top_category_amount": top_category_amount,
+            "top_category_amount_display": f"{top_category_amount:.2f}",
+            "rolling_30d_spend": rolling_30d_spend,
+            "rolling_30d_spend_display": f"{rolling_30d_spend:.2f}",
             "spend_delta_pct": f"{spend_delta_pct:.1f}",
             "spend_delta_pct_value": spend_delta_pct,
+            "spend_delta_pct_display": f"{spend_delta_pct:.1f}",
+            "previous_30d_spend": previous_30d_spend,
+            "previous_30d_spend_display": f"{previous_30d_spend:.2f}",
+            "spend_12m_total": spend_12m_total,
+            "spend_12m_total_display": f"{spend_12m_total:.2f}",
+            "avg_12m_monthly": avg_12m_monthly,
+            "avg_12m_monthly_display": f"{avg_12m_monthly:.2f}",
+            "latest_month_label": latest_month_label,
             "filter_month": month or "",
             "filter_start_date": start_date or "",
             "filter_end_date": end_date or "",
+            "app_version": settings.PROJECT_VERSION,
         },
     )
 
