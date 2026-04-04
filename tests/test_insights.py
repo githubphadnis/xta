@@ -163,3 +163,41 @@ def test_delete_saved_query():
     second_delete = client.delete(f"/api/insights/{saved_id}", headers=headers)
     assert second_delete.status_code == 404
     app.dependency_overrides.clear()
+
+
+def test_insights_intent_echoes_auto_when_not_provided():
+    TestingSessionLocal = _setup_test_db()
+    db = TestingSessionLocal()
+    db.add(
+        Expense(
+            owner_email="alice@example.com",
+            vendor="Store A",
+            amount=10.0,
+            currency="EUR",
+            base_currency_amount=10.0,
+            base_currency="EUR",
+            fx_rate=1.0,
+            date=date(2026, 1, 1),
+            category="Groceries",
+            description="",
+            source_type="manual",
+        )
+    )
+    db.commit()
+    db.close()
+
+    def override_get_db():
+        test_db = TestingSessionLocal()
+        try:
+            yield test_db
+        finally:
+            test_db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    client = TestClient(app)
+    headers = {"cf-access-authenticated-user-email": "alice@example.com"}
+    response = client.post("/api/insights/ask", data={"question": "show category split"}, headers=headers)
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == "auto"

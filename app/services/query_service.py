@@ -41,6 +41,7 @@ class QueryService:
         month: str | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
+        intent: str | None = None,
     ) -> QueryResult:
         normalized = (question or "").strip().lower()
         if not normalized:
@@ -48,6 +49,18 @@ class QueryService:
 
         date_range = self._resolve_date_range(month=month, start_date=start_date, end_date=end_date)
         where_clause, params = self._build_where_clause(owner_email=owner_email, date_range=date_range)
+        normalized_intent = (intent or "").strip().lower()
+        if normalized_intent:
+            if normalized_intent == "visits":
+                normalized = "visits by vendor"
+            elif normalized_intent == "spend_by_category":
+                normalized = "biggest category spend"
+            elif normalized_intent == "spend_by_vendor":
+                normalized = "vendor spend"
+            elif normalized_intent == "monthly_trend":
+                normalized = "monthly trend"
+            elif normalized_intent == "category_split":
+                normalized = "category split"
 
         if "visit" in normalized and ("store" in normalized or "vendor" in normalized or "merchant" in normalized):
             sql_query = """
