@@ -9,7 +9,6 @@ from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.parsing import parse_filter_dates
 from app.core.security import require_user_email
 from app.db.session import get_db
 from app.routers import expenses, insights, upload
