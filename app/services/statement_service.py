@@ -266,4 +266,54 @@ class StatementService:
                 break
         return expenses
 
+    @staticmethod
+    def parse_fallback_unstructured(file_contents: bytes, filename: str) -> list:
+        """
+        Best-effort fallback parser for unstructured sheets:
+        - extracts numeric values
+        - creates pseudo transactions with generic metadata
+        """
+        try:
+            if filename.lower().endswith(".csv"):
+                df = pd.read_csv(io.BytesIO(file_contents), header=None, dtype=str, encoding_errors="replace")
+            else:
+                df = pd.read_excel(io.BytesIO(file_contents), header=None, dtype=str)
+        except Exception:
+            return []
+
+        expenses: list[dict] = []
+        for _, row in df.iterrows():
+            cells = [str(value).strip() for value in row.tolist() if str(value).strip() not in {"", "nan", "None"}]
+            if not cells:
+                continue
+            amount = None
+            for value in cells:
+                normalized = value.replace(",", ".").replace(" ", "")
+                try:
+                    parsed = float(normalized)
+                except ValueError:
+                    continue
+                if parsed < 0:
+                    amount = abs(parsed)
+                    break
+                if parsed > 0 and amount is None:
+                    amount = parsed
+            if amount is None:
+                continue
+
+            vendor = next((c for c in cells if any(ch.isalpha() for ch in c)), "Unstructured Import")
+            expenses.append(
+                {
+                    "vendor": vendor[:120],
+                    "date": pd.Timestamp.now().strftime("%Y-%m-%d"),
+                    "amount": float(amount),
+                    "currency": "EUR",
+                    "category": "Uncategorized",
+                    "description": "Unstructured statement fallback",
+                }
+            )
+            if len(expenses) >= 500:
+                break
+        return expenses
+
 statement_service = StatementService()

@@ -9,6 +9,7 @@ from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.parsing import parse_filter_dates
 from app.core.security import require_user_email
 from app.db.session import get_db
 from app.routers import expenses, insights, upload
@@ -144,6 +145,18 @@ def read_root(
         )
         .all()
     )
+    for tx_date, tx_amount in recent_year_rows:
+        key = tx_date.strftime("%Y-%m")
+        monthly_rollup[key] = monthly_rollup.get(key, 0.0) + float(tx_amount or 0.0)
+    spend_12m_total = sum(monthly_rollup.values())
+    avg_12m_monthly = (spend_12m_total / len(monthly_rollup)) if monthly_rollup else 0.0
+    latest_month_label = max(monthly_rollup.keys()) if monthly_rollup else "N/A"
+
+    # 5) Get Recent Activity (Last 5 expenses) in selected range
+    recent_expenses = (
+        base_query.order_by(Expense.date.desc(), Expense.id.desc()).limit(5).all()
+    )
+    monthly_rollup: dict[str, float] = {}
     for tx_date, tx_amount in recent_year_rows:
         key = tx_date.strftime("%Y-%m")
         monthly_rollup[key] = monthly_rollup.get(key, 0.0) + float(tx_amount or 0.0)
