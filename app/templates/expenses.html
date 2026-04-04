@@ -156,8 +156,7 @@
         const response = await fetch('/api/insights/saved');
         if (!response.ok || !list) return;
         const rows = await response.json();
-        const pinned = rows.filter((row) => row.is_pinned);
-        if (!pinned.length) {
+        if (!rows.length) {
             list.innerHTML = '<li class="text-gray-500">No pinned insights yet.</li>';
             return;
         }

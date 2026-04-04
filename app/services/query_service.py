@@ -13,6 +13,7 @@ from app.core.config import settings
 @dataclass
 class QueryResult:
     question: str
+    intent: str
     sql_query: str
     chart_type: str
     labels: list[str]
@@ -116,6 +117,7 @@ class QueryService:
             summary += f" Date range: {date_range.start_date.isoformat()} to {date_range.end_date.isoformat()}."
         return QueryResult(
             question=question,
+            intent=normalized_intent or "auto",
             sql_query=" ".join(sql_query.split()),
             chart_type=chart_type,
             labels=labels,

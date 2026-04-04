@@ -1,4 +1,3 @@
-from datetime import date as date_type
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
@@ -8,6 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.parsing import parse_filter_dates, parse_iso_date
 from app.core.security import require_user_email
 from app.db.session import get_db
 from app.models.expense import Expense
@@ -17,19 +17,6 @@ from app.services.finance import fx_service
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-
-def _parse_filter_dates(month: str | None, start_date: str | None, end_date: str | None) -> tuple[date_type | None, date_type | None]:
-    if month:
-        year, month_num = month.split("-", 1)
-        start = datetime.strptime(f"{year}-{month_num}-01", "%Y-%m-%d").date()
-        if int(month_num) == 12:
-            end = datetime.strptime(f"{int(year) + 1}-01-01", "%Y-%m-%d").date()
-        else:
-            end = datetime.strptime(f"{year}-{int(month_num) + 1:02d}-01", "%Y-%m-%d").date()
-        return start, end
-    parsed_start = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
-    parsed_end = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
-    return parsed_start, parsed_end
 
 @router.post("/expenses/confirm")
 async def confirm_expense(
@@ -42,10 +29,7 @@ async def confirm_expense(
     receipt_url: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    try:
-        parsed_date = datetime.strptime(date, "%Y-%m-%d").date()
-    except ValueError:
-        parsed_date = datetime.now().date()
+    parsed_date = parse_iso_date(date) or datetime.now().date()
     user_email = require_user_email(request)
     normalized_currency = (currency or settings.BASE_CURRENCY).upper()
     base_currency_amount, fx_rate = fx_service.convert_to_base(amount, normalized_currency, parsed_date)
@@ -79,12 +63,12 @@ async def my_expenses(
 ):
     user_email = require_user_email(request)
     query = db.query(Expense).filter(Expense.owner_email == user_email)
-    filter_start, filter_end = _parse_filter_dates(month=month, start_date=start_date, end_date=end_date)
+    filter_start, filter_end, month_mode = parse_filter_dates(month=month, start_date=start_date, end_date=end_date)
     if filter_start:
         query = query.filter(Expense.date >= filter_start)
     if filter_end:
         # End date is inclusive for explicit range; exclusive when derived from month.
-        if month:
+        if month_mode:
             query = query.filter(Expense.date < filter_end)
         else:
             query = query.filter(Expense.date <= filter_end)
@@ -93,6 +77,7 @@ async def my_expenses(
         request=request,
         name="expenses.html",
         context={
+            "request": request,
             "expenses": expenses,
             "base_currency": settings.BASE_CURRENCY,
             "pinned_queries": (
@@ -104,6 +89,7 @@ async def my_expenses(
             "filter_month": month or "",
             "filter_start_date": start_date or "",
             "filter_end_date": end_date or "",
+            "app_version": settings.PROJECT_VERSION,
         },
     )
 
@@ -126,13 +112,13 @@ async def get_chart_data(
     db: Session = Depends(get_db),
 ):
     user_email = require_user_email(request)
-    filter_start, filter_end = _parse_filter_dates(month=month, start_date=start_date, end_date=end_date)
+    filter_start, filter_end, month_mode = parse_filter_dates(month=month, start_date=start_date, end_date=end_date)
 
     base_filter = [Expense.owner_email == user_email]
     if filter_start:
         base_filter.append(Expense.date >= filter_start)
     if filter_end:
-        if month:
+        if month_mode:
             base_filter.append(Expense.date < filter_end)
         else:
             base_filter.append(Expense.date <= filter_end)

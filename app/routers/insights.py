@@ -29,6 +29,7 @@ async def ask_question(
     )
     return {
         "question": result.question,
+        "intent": result.intent,
         "summary": result.summary,
         "sql": result.sql_query,
         "chart": {

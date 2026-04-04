@@ -62,5 +62,32 @@ graph TD
 | | Geospatial Visualization | Planned |
 | | Data Export / Tax Readiness | Planned |
 | | Itemization per receipt | Planned |
+| **April 1, 2026** | Ingest Confidence Banner (mapped/skipped/fallback) | Done |
+| | Date-Filtered Insights (month/range ask mode) | Done |
+| | App Version Surfacing (UI + health) | Done |
 | | Hardening, Encrypt data, Scan for Crypto | Planned |
 | | Scan Containers, Generate SBOMs, Generate CBOMs | Planned |
+
+## Operations Runbook (Backup & Restore)
+
+### Backup database snapshot
+Use the helper script from repo root:
+
+```bash
+bash scripts/export_db_backup.sh
+```
+
+This creates:
+
+- `backups/xta_<db_name>_<timestamp>.dump` (PostgreSQL custom format)
+
+### Restore from snapshot
+Use the restore helper with a dump file:
+
+```bash
+bash scripts/restore_db_backup.sh backups/xta_xta_db_YYYYMMDD_HHMMSS.dump
+```
+
+### Notes
+- Scripts use environment variables from your shell (or defaults from app config values).
+- Make sure app writes are paused during restore for data consistency.

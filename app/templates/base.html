@@ -13,8 +13,9 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
+                    <div class="flex-shrink-0 flex items-center gap-2">
                         <span class="text-2xl font-bold text-indigo-600">XTA</span>
+                        <span class="text-xs font-medium text-gray-400">v{{ app_version or "dev" }}</span>
                     </div>
                     <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-8">
                         <a href="/" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Dashboard</a>
@@ -47,7 +48,7 @@
 
     <footer class="bg-white border-t border-gray-200 mt-auto">
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <p class="text-center text-sm text-gray-500">&copy; 2026 Xpense Tracking App. Secure & Private.</p>
+            <p class="text-center text-sm text-gray-500">&copy; 2026 Xpense Tracking App. Secure & Private. Version {{ app_version or "dev" }}.</p>
         </div>
     </footer>
 

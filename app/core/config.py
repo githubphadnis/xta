@@ -19,7 +19,7 @@ def _parse_bool(value: str, default: bool) -> bool:
 
 class Settings:
     PROJECT_NAME: str = "Xpense Tracking Application"
-    PROJECT_VERSION: str = "0.1.0"
+    PROJECT_VERSION: str = os.getenv("APP_VERSION", "0.1.0")
     
     # 2. Infrastructure Config (Loaded from .env with defaults)
     # The syntax is: os.getenv("VARIABLE_NAME", "default_value_if_missing")
